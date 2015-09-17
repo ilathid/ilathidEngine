@@ -1,158 +1,89 @@
-# Gamestate
+import re
+# TODO:
+""" Gamestate changes:
+- all gamestate variables must be given a default.
+- gamestate is a globally accessable module (classmethods)
+- Types of gamestate variables should be T/F, Numeric or String. (for ease of saving)
 
-# Gamestate Condition Tree
-# This is used to store gamestate logic, to spare on trivial callback functions
-# lightImage.setCondition(GSAnd(GSOr("SomeArea.door1_locked", "SomeArea.door1_broken"), GSNot("PowerAge.PowerArea.isPoweredDown")))
-class GSCondNode:
-    nodes = []
-    def __init__(self, *nodes):
-        self.nodes = []
-        for node in nodes:
-            if isinstance(node, str):
-                self.nodes.append(GSCondLeaf(node))
-            else:
-                self.nodes.append(node)
+defaults are set like this, perhaps:
+defaults = {}
+defaults["space.age2.people"] = 45.6
+defaults["space.age2.food"] = True
+defaults["game.some_option"] = "option_name"
 
-class GSNand(GSCondNode):   
-    def evaluate(self, gamestate):
-        for node in self.nodes:
-            if node.evaluate(gamestate): return False
-        return True
+and then in the game initialization:
+from ... import defaults
+Gamestate.loadDefaults(defaults)
 
-class GSNot(GSNand):
-    pass
-
-class GSAnd(GSCondNode):
-    def evaluate(self, gamestate):
-        for node in self.nodes:
-            if not node.evaluate(gamestate): return False
-        return True
-        
-class GSOr(GSCondNode):
-    def evaluate(self, gamestate):
-        for node in self.nodes:
-            if node.evaluate(gamestate): return True
-        return False
-
-
-
-class GSCond:
-    node = ""
-    def __init__(self, node):
-        self.node = node
-
-class GSCondEquals(GSCond):
-    def __init__(self, node1, node2):
-        self.node1 = node1
-        self.node2 = node2
-        
-    def evaluate(self, gamestate):
-        val1 = gamestate.getState(self.node1)
-        return val1 == self.node2
-        
-class GSCondEqualsNode(GSCond):
-    def __init__(self, node1, node2):
-        self.node1 = node1
-        self.node2 = node2
-        
-    def evaluate(self, gamestate):
-        val1 = gamestate.getState(self.node1)
-        val2 = gamestate.getState(self.node2)
-        return val1 == val2
-
-class GSCondLeaf(GSCond):
-    def evaluate(self, gamestate):
-        return gamestate.getState(self.node) # Just a true/false get
-
-# Idea:
-# 1. Gamestate variables are:
-#    T/F
-#    Numeric
-#    String
-# 2. Unset variables are None
-# 3. Whoever USES a gamestate variable must also know its default value, e.g. the default exists only for that context and is set in that context.
-
-
-# e.g.
-#
-# year = spaceAge.getState("computer_state.year")
-# if year == None: year = 1985
-# draw to screen: image of 1985
-
-# Also:
-# spaceAge = gamestate.getState("SpaceAge")
-# gamestate.getState("SpaceAge.var1")
-# is equal to
-# spaceAge.getState("var1")
-
-# This way an age need not know anything about another age.
+example of test:
+from Engine.Gamestate import Gamestate as G
+defaults = {'t1':5,'t2':True,'t3':'string','t4':False}
+G.loadDefaults(defaults)
+print "t1: " + str(G.getVar('t1'))
+print "t3: " + G.getVar('t3')
+print "t2 and t4: " + str(G.evaluate('t2 and t4'))
+print "t2 or t4: " + str(G.evaluate('t2 or t4'))
+"""
 
 class Gamestate:
-    name = ""
-    elements = {} # Other Gamestate elements, or key:values
-    ticket = 0    # To check if anything has modified this gamestate
+    pattern = re.compile("(and|or|not)")
+
+    vals = {}
+    defaults = {}
+    ticket = 0
     
-    def __init__(self, name):
-        self.name = name
-    
-    def getState(self, expression):
-        return self.getList(expression.split("."))
-    
-    def getList(self, parts):        
-        # First find if this gamestate name is in the parts
-        while self.name in parts:
-            parts.pop(0)
-        
-        if len(parts) == 0:
-            return None
-        
-        p1 = parts.pop(0)
-        if p1 in self.elements:
-            it = self.elements[p1]
-            if isinstance(it, Gamestate): # this is becoming a habit...
-                return it.getList(parts)
-            else:
-                return it
-        return None
-        
-    def setState(self, parts, value):
-        self.setList(parts.split("."), value)
-        
-    def setList(self, parts, value):
-        # First find if this gamestate name is in the parts
-        while self.name in parts:
-            parts.pop(0)
-        
-        p1 = parts.pop(0)
-        if len(parts) > 0:
-            if not p1 in self.elements or not isinstance(self.elements[p1], Gamestate):
-                self.elements[p1] = Gamestate(p1)
-            self.elements[p1].setList(parts, value)
+    @classmethod
+    def setVar(self, var, value):
+        if var in Gamestate.defaults.keys():
+            Gamestate.vals[var] = value
         else:
-            self.elements[p1] = value
-        
-        # Update the ticket number
-        self.ticket = (self.ticket + 1) % (1 << 16)
+            raise Exception("Must initialize key: " + var)
+        Gamestate.ticket += 1
     
-    def getTicket(self):
-        return self.ticket
-    
-    def hasChanged(self, ticket):
-        return ticket != self.ticket
-            
-gs = Gamestate("game")
-gs.setState("light_on", True)
-gs.setState("light_num", 5)
-gs.setState("Area1.foggy", True)
-# print gs
-# print gs.elements
-c1 = GSAnd("light_on", GSNot("Area1.sunny"))
-print c1.evaluate(gs)
-c2 = GSAnd("light_on", GSCondEquals("light_num", 4))
-print c2.evaluate(gs)
-c2 = GSAnd("light_on", GSCondEquals("light_num", 5))
-print c2.evaluate(gs)
-c2 = GSAnd("distant_age.light_on", GSCondEquals("light_num", 5))
-print c2.evaluate(gs)
-gs.setState("distant_age.light_on", True)
-print c2.evaluate(gs)
+    @classmethod
+    def getVar(self, var):
+        #print "get " + var
+        if var in Gamestate.defaults.keys():
+            if var in Gamestate.vals.keys():
+                return Gamestate.vals[var]
+            else:
+                return Gamestate.defaults[var]
+        else:
+            raise Exception("Must initialize key: " + var)
+
+    @classmethod
+    def loadDefaults(self, defaults):
+        """ defaults: dict of key-value pairs """
+        Gamestate.defaults = defaults
+
+
+    # TODO: We talked about executing the string as python code somehow. For now it is just and, or, not and variable names
+    @classmethod
+    def evaluate(self, string):
+        #print "Eval " + string
+        groups = Gamestate.pattern.split(string)
+        #print groups
+        val = None
+        op = None
+        for group in groups:
+            if group.strip() == "and":
+                op = "and"
+            elif group.strip() == "or":
+                op = "or"
+            elif group.strip() == "not":
+                op = "not"
+            else:
+                if op is None:
+                    val = group.strip()
+                else:
+                    if op == "and":
+                        val = Gamestate.getVar(val) and Gamestate.getVar(group.strip())
+                    if op == "or":
+                        val = Gamestate.getVar(val) or Gamestate.getVar(group.strip())
+                    if op == "not":
+                        val = not Gamestate.getVar(group.strip())
+        if val is None:
+            val = False
+        if op is None:
+            val = Gamestate.getVar(val.strip())
+        return val

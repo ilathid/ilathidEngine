@@ -35,51 +35,86 @@
                     :XZ880B00Z80B08Za7.
 """
 
-# SlideManager contains the stack of slides and manages pushing/popping menus
-
-
 class SlideManager:
-    
-    # Slides are added to this stack (especially useful for menus)
+    age_manager = None
+
+    # Slides are added to this stack (especially useful for menus)    
     _slide_stack = []
+    current_slide = None
     
-    @classmethod
-    def getCurrentSlide(self):
-        return SlideManager._slide_stack[-1]
-    
-    @classmethod
-    def pushSlide(self, newslide):
-        SlideManager._slide_stack.append(newslide)
-        if len(SlideManager._slide_stack) > 1:
-            newslide.enter(SlideManager._slide_stack[-2])
-        else:
-            newslide.enter()
-    
-    @classmethod
-    def getBaseSlide(self):
-        return SlideManager._slide_stack[0]
-    
-    @classmethod
+    def __init__(self, ageManager):
+        self.age_manager = ageManager
+        
+    def pushSlide(self, slide):
+        """ slide is a string """
+        # stores age name, slide name
+        self._slide_stack.push([self.age_manager.getAge().getName(), self.current_slide])
+        self.setSlide(slide)
+        
     def popSlide(self):
-        oldslide = SlideManager._slide_stack.pop()
-        oldslide._exit(SlideManager._slide_stack[-1])
+        if len(self._slide_stack) == 0:
+            raise Exception('SlideManager: popped from an empty stack')
+            
+        # on exit
+        oldslide = self.getSlide()
+        if oldslide != None:
+            oldslide.exit()
+            
+        [age_name, slide_name] = self._slide_stack.pop()
+        age = self.age_manager.setAge(age_name)
+        self.current_slide = slide_name
+
+        # Load the slide into memory
+        slide = self.age_manager.getAge().getSlide(slide_name)
+        slide.makeBuffers()
+
+        # Handle slide change
+        age.manageBuffers(slide_name)
+
+        #Do entry callback
+        # print "Entering slide " + str(newSlide)
+        newSlide.entry()
         
-        if len(SlideManager._slide_stack) > 0:
-            SlideManager._slide_stack[-1].enter(oldslide)
+    def getSlide(self):
+        """ return: slide object of the current slide """
+        if self.age_manager.getAge() != None:
+            return self.age_manager.getAge().getSlide(self.current_slide)
         else:
-            # we emptied the stack, exit
-            quit()
+            return None
         
-    @classmethod
-    def replaceTopSlide(self, newslide):
-        oldslide = SlideManager._slide_stack[-1]
-        oldslide._exit(newslide)
-        SlideManager._slide_stack[-1] = newslide
-        newslide.enter(oldslide)
-    
-    @classmethod
-    def resetStackTo(self, newstack):
-        oldslide = SlideManager._slide_stack[-1]
-        SlideManager._slide_stack = newstack
-        SlideManager._slide_stack[-1].enter(oldslide)
-    
+    def setSlide(self, slide):
+        """ slide is a string """
+        # on exit
+        oldslide = self.getSlide()
+        if oldslide != None:
+            oldslide.exit()
+
+        if slide is None:
+            return
+
+        # dot-parse it
+        parts = slide.split(".")
+        if len(parts) == 1:
+            # Just assume it is in the current age
+            newAge = self.age_manager.getAge()
+            newSlide = newAge.getSlide(parts[0])
+        elif len(parts) == 2:
+            newAge = self.age_manager.setAge(parts[0])
+            newSlide = newAge.getSlide(parts[1])
+        else:
+            raise Exception('SlideManager: Must be a 1 or 2 part slide name.')
+
+        # Current slide is stored in an age.slide pair, same as everything on the stack
+        self.current_slide = newSlide.getName()
+        
+        # Load the new slide into memory
+        newSlide.makeBuffers()
+        
+        # Handle slide change
+        newAge.manageBuffers(self.current_slide)
+        
+        #Do entry callback
+        # print "Entering slide " + str(newSlide)
+        newSlide.entry()
+        
+        return newSlide

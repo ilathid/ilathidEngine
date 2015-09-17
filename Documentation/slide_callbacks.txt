@@ -1,0 +1,42 @@
+Engine Documentaion Ideas
+
+- how to write objects in the age .py file directly
+- how to write xml directly
+- how to use the age editor
+
+Right now, I figure the most important is how to write with xml
+
+slide.callbacks
+slide.callbacks is a dictionary of callback functions. If set, they are called by the engine at particular times. They are not set by the engine, so they are available to the game developer.
+'entry'         called when a slide is being entered
+'exit'          called when a slide is being exited
+
+The callback can be set in one of a few different ways:
+
+in xml:
+
+<slide id="dni1">
+    <file>dnichamber1.jpg</file>
+    <hotspot cursor="left">
+        <rect>0,0,100,500</rect>
+        <dest>dni3</dest>
+    </hotspot>
+    ...
+   <onentry>somefunc</onentry>
+</slide>
+
+in Dni.py:
+
+def init(self):
+    ...
+    dni1 = self._slides["dni1"]
+    dni1.callbacks['entry'] = self.somefunc
+
+Both of these methods have the same result. The function should be defined as follows:
+
+class Dni(Age):
+    ...
+    def somefunc(self, slide):
+	    pass
+
+'self' will obviously be the Dni age object, and slide will be the slide on which the callback was attatched. In this case, slide is the same as dni1 above.

@@ -1,39 +1,3 @@
-"""
-                   .7a000BBBWBBBBB0B8Z;.                    
-               :XZ80000Z7;,.   .:rXZ8B08827                 
-             S0ZZ02r                  :ra0Z88X              
-           aZa82;                         7aZZZS            
-         SZaZ7                              .SZZZr          
-       iZ2aS                 i                 SZa2:        
-      2aa2.                 ,W                  ra2ar       
-     a2aX                   S8:                   2SaS      
-    ZS7.                    2X2                    i7SS     
-   aXSXZS0WWWWWWB088BWWWW0aaXrX8aBWWWW088BWWWWWWW0S2SS27    
-  ;SS2 X.         7        Xr;;X       i           7 ZXZ    
- .ZXS   Z7       XZZ      87rrrSX     7ZZ.       ;2   aXZ   
- ;SSr    ar     ra;S2     ar;;r7a    :2rXZ      :2    aXa,  
- arZ      Zr   72rrrS2   ZX;;rrrXS  :Z7rrX2    .0     i272  
- ar8       0, 8Ba222280 ,B2222222B rBa22228W: .Z       a7Z  
-,SrZ        Zr:::::::,. ; ,,,:::. ;.,,::::,;i 0        S7a, 
-,XXX         8         XX         a,         W         7X2: 
-,X7X          W,     XZX2Z      ,aSSZ.     .Z          7X2i 
-,S7Z           Zi  :2S7;rSS     Z7rrXar    Z           SXa. 
- 2rZ            2 Sa7r;;;rSX  :a7r;;;7Sa  a            aXa  
- 2Xa            :2X7;;rr7XSBX,WZX7;r;rrX2a            rSS7  
- i2X7          ZaX7SSZ88ZSi  7 .Xa88Z2X7rS2           a7Z.  
-  8X2        0MBZar2        7a,       ;ZZ8B@2        :2X2   
-  ,aS8      ;       Z      X2Xa7      7     7Z       aXZ    
-   72SX              0    2S7r72r    a,             2Sai    
-    222S              8  aZSXXX28X  2:             2Sa;     
-     2a22             .Z;XXXX777X2 Si            ,aSZ7      
-      Xa2ar             S         2,            2aaZ,       
-        aaaZ.            B       a.           iaaZS         
-         i8aZ2:           0     Si          rZaZa,          
-           r8ZZZS         .Z   Xi        :2ZZZZi            
-             ;aZZ8Za;       ; i,      7a8ZZZS,              
-                iS0B0000Zar:SSX:7a8B00000X:                 
-                    :XZ880B00Z80B08Za7.
-"""
 # This is my proposed movie player for the python engine of ilathid.
 
 import threading
@@ -88,7 +52,7 @@ class AudioPlayback:
     # Add audio to the audio buffer, to be played by the processing thread
     def play(self, data, sndlen):
         if self._stop.isSet() or self._fstop.isSet():
-            print str(self.__class__.__name__) + ".play(): Sound module has been stopped"
+            print(str(self.__class__.__name__) + ".play(): Sound module has been stopped")
             return False
         # add to buffer
         self._blk.acquire()
@@ -141,7 +105,7 @@ class MovieInternal:
     
     adecoder   = None
     vdecoder   = None
-    callback = None # Callback Class, Implements onVideoReady( vfr ), where data is vfr.data
+    callback = None # Callback Class, Implements callback( vfr ), where data is vfr.data
     
     demux = None # Demuxer
     
@@ -231,8 +195,8 @@ class MovieInternal:
                 # Skip if the start of the next sound is closer than the end of the current
                 # sound. (but using 3/4)
                 if ctime + qtime > atime + 3.0*sndlen / 4:
-                    print " A Delete Too Late"
-                    print "  ",ctime, qtime, atime, sndlen
+                    print(" A Delete Too Late")
+                    print("  ",ctime, qtime, atime, sndlen)
                 else:            
                     # Queue the audio segment
                     self.snd.play( adata.data, sndlen )         
@@ -264,12 +228,12 @@ class MovieInternal:
                     # Otherwise, delete, one frame at a time: audio has presedence            
                     if (ctime - vtime) <= self.vfTime*5:
                         if vdata.data != None:
-                            self.callback.onVideoReady( vdata )
+                            self.callback( vdata )
                             # print "<Video>"
                         else:
-                            print "<VIDFAIL>"
+                            print("<VIDFAIL>")
                     else:
-                        print "  V Delete Late"
+                        print("  V Delete Late")
                         del vdata                
             else:
                 t2 = vtime - ctime
@@ -301,7 +265,7 @@ class MovieInternal:
         try:
             vdata = self.vdecoder.decode( vfr[0] )
         except Exception as e:
-            print e
+            print(e)
             vdata = None
         
         #for i in range(5): # Try more than once
@@ -335,7 +299,7 @@ class MovieInternal:
             #     raise Exception("PTS Video Frame Failed to Render")
             # print "F",
             if vfr[1]>0:
-                print "PTS Video Frame Failed to Render"
+                print("PTS Video Frame Failed to Render")
         # print "["+str(self.v_i)+"]",
         self.v_i = self.v_i + 1
         return vdata
@@ -352,8 +316,14 @@ class MoviePreloaded(MovieInternal):
     audio_index = -1 # id for raw audio frames
     snd = None
     
+    def __del__(self):
+        self.demux.reset()
+        del self.demux
+        del self.adecoder
+        del self.vdecoder
+    
     def __init__(self, data, callbackClass=None):
-        print "Init", len(data)
+        print("Init", len(data))
         if len(data) > 10485160*3:
             raise Exception("MORE THAN 30 MEGABYTES!!! TOO BIG!!!")
         # initialize variables
@@ -367,6 +337,9 @@ class MoviePreloaded(MovieInternal):
         # Parse the data: takes time
         # Needed to load stream information
         # TODO: if file-based, demux only a sample
+        
+        self.demux.reset() # TODO: This line fails internally in pymedia.
+        
         pstream = self.demux.parse( data )
         del data
         
@@ -428,7 +401,7 @@ class MoviePreloaded(MovieInternal):
                 self.vfTime = 1.0 / vfr.rate
 
     def makeVDecoder(self):
-        print "Making vDecoder", self.demux.streams
+        print("Making vDecoder", self.demux.streams)
         try:
             return pymedia.video.ext_codecs.Decoder( self.demux.streams[self.video_index] )
         except:
@@ -460,6 +433,9 @@ class MoviePreloaded(MovieInternal):
 
     # Stop Control/Event
 
+    def isPlaying(self):
+        return self.state == self.PLAY
+
     def stop(self):
         if self.state == self.PLAY:
             self.event.append(self.STOP)
@@ -479,8 +455,8 @@ class MoviePreloaded(MovieInternal):
             # TODO: the following needs a big "if" for file-based.
             # file-based has its own logic, which is just: loop is on or off.
             # Looping
-            if self.state == self.STOP and 'loop' in options:
-                print "Looping"
+            if self.state == self.STOP and 'loop' in options and options['loop']:
+                print("Looping")
                 if 'loopstart' in options and options['loopstart'] > 0:
                     self._Seek(options['loopstart'])
                 vlframe = self.vi()
@@ -502,7 +478,7 @@ class MoviePreloaded(MovieInternal):
         if self.snd != None:
             self.snd.begin()
 
-        print "_Play"        
+        print("_Play")        
         while len(self.event) > 0:
             # Handle Events
             ev = self.event.pop(0)
@@ -533,13 +509,13 @@ class MoviePreloaded(MovieInternal):
         self.frame = 1
         # time.sleep(5)
         p1 = False
-        print vlinfo
+        print(vlinfo)
         # Stop playback for: 1 Any event 2 neither audio nor video content remains
         while len(self.event) == 0 and (self.a_i <= len(self.aBuffer) - 1 or self.v_i <= len(self.vBuffer) - 1): # and self.state == self.PLAY
         
             # file-reader as well.
             if vlinfo != None and not p1 and self.v_i >= vlinfo['vlframe']:
-                print "saveloop"
+                print("saveloop")
                 p1 = True
                 # print "t,vi,ai,frame,vtime_start",time.time()-self.tstart, vlinfo['vlframe'],self.v_i,self.a_i,self.frame,self.vtime_start
                 # 258
@@ -557,7 +533,7 @@ class MoviePreloaded(MovieInternal):
             
             # Looping
             if p1 and ((vlinfo['loopend'] > 0 and self.ctime() > vlinfo['loopend']) or self.v_i >= len(self.vBuffer) - 1):
-                print 'restoreloop', lv_i
+                print('restoreloop', lv_i)
                 self.v_i = lv_i
                 self.a_i = la_i
                 self.tstart = time.time() - ltime
@@ -577,7 +553,7 @@ class MoviePreloaded(MovieInternal):
                             break
                         vfr = self.vfr()
                 except Exception as e:
-                    print e
+                    print(e)
 
                 # print self.tstart
                 # p1 = False
@@ -591,7 +567,7 @@ class MoviePreloaded(MovieInternal):
         self.unpause_time = time.time() - self.tstart
 
     def _Stop(self):
-        print "_Stop"    
+        print("_Stop")    
         # reset functions do goofy things. Remake the decoders (for next time)
         # if self.audio_index != -1:
         #     del self.adecoder
@@ -612,7 +588,7 @@ class MoviePreloaded(MovieInternal):
         self.unpause_time = 0.0
     
     def _Pause(self):
-        print "_Pause"
+        print("_Pause")
     
     # Seek Control/Event
     def seek(self, time):
@@ -626,17 +602,17 @@ class MoviePreloaded(MovieInternal):
     
     # Seek to the specified time
     def _Seek(self, seek_time):
-        print "_Seek"
+        print("_Seek")
         try:
             self._Stop()
             (vlframe, vltime) = self.vseek(seek_time)
-            print "Seeking frame, time", (vlframe, vltime, seek_time)
+            print("Seeking frame, time", (vlframe, vltime, seek_time))
             self.a_i = self.aseek(vltime)
             self.v_i = vlframe
             self.unpause_time = vltime
             self.state = self.PAUSE
         except Exception as e:
-            print e
+            print(e)
             self._Stop()
     
     # vseek
@@ -668,7 +644,7 @@ class MoviePreloaded(MovieInternal):
             pts1 = 0.0
             pts2 = len(self.vBuffer) * self.vfTime
 
-        print "pts bounds",pts1, pts2
+        print("pts bounds",pts1, pts2)
                 
         # Try to guess the video index. Back up a bit...
         guess_i = len(self.vBuffer) * (time-pts1)/float(pts2-pts1)
@@ -687,8 +663,8 @@ class MoviePreloaded(MovieInternal):
         self.frame = 1
         self.vtime_start = self.vfr()[1]
            
-        print "Guessing video index",self.vi()
-        print "vtime_start",self.vtime_start
+        print("Guessing video index",self.vi())
+        print("vtime_start",self.vtime_start)
         
         # Start decoding, frames, looking for something that can be the 'first' frame after
         # a seek operation
@@ -702,7 +678,7 @@ class MoviePreloaded(MovieInternal):
             if vdata and vdata.data and self.vtime(vfr) >= time:
                 # Success!
                 break
-            print self.vtime(vfr), time
+            print(self.vtime(vfr), time)
             vfr = self.vfr()
             # self.vdecoder = self.makeVDecoder()
         
@@ -750,5 +726,3 @@ class MoviePreloaded(MovieInternal):
             guess_i = guess_i - 1
         
         return guess_i
-        
-        

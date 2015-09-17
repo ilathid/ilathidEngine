@@ -1,0 +1,1151 @@
+<?xml version="1.0" ?>
+<age name="Dni" start="dni1">
+    <slide id="pres">
+        <file>pres.jpg</file>
+    </slide>
+    <slide id="dni1">
+        <file>dnichamber1.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni3</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni2</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni4</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni2">
+        <file>dnichamber2.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni1</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni4</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni3</dest>
+        </hotspot>
+    </slide>
+
+    <slide id="dni3">
+        <file>dnichamber3.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni4</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni1</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni2</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni4">
+        <file>dnichamber4.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni2</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni3</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni1</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni5</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni5">
+        <file>dnichamber5.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni6</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni7</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni8</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni6">
+        <file>dnichamber6.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni8</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni5</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni7</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni12</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni7">
+        <file>dnichamber7.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni5</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni8</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni6</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni8">
+        <file>dnichamber8.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni7</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni6</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni5</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni1</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni9">
+        <file>dnichamber9.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni11</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni12</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni10</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni10"> 
+        <file>dnichamber10.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni12</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni11</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni9</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni11">
+        <file>dnichamber11.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni10</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni9</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni12</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni7</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni12">
+        <file>dnichamber12.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni9</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni10</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni11</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni14</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni13">
+        <file>dnichamber13.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni15</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni14</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni16</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni14">
+        <file>dnichamber14.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni13</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni15</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni15">
+        <file>dnichamber15.jpg</file>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni13</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni14</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni11</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni16">
+        <file>dnichamber16.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni18</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni19</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni17</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni22</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni17">
+        <file>dnichamber17.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni19</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni18</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni16</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni15</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni18">
+        <file>dnichamber18.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni17</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni16</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni19</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>394,84,200,110</rect>
+            <dest>dni20</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni19">
+        <file>dnichamber19.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni16</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni17</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni18</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni20">
+        <file>dnichamber20.jpg</file>
+        <hotspot cursor="left180">
+            <rect>0, 500, 800, 100</rect>
+            <dest>dni18</dest>
+        </hotspot>
+        <hotspot cursor="plus">
+            <rect>155, 275, 100, 100</rect>
+            <dest>dni21</dest>
+            <cond>not Dni.switch</cond>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni21">
+        <file>dnichamber21.jpg</file>
+        <image id="dni21image">
+            <file>switch-unlocked.jpg</file>
+            <rect>0, 0, 800, 600</rect>
+            <cond>Dni.switch</cond>
+        </image>
+        <hotspot cursor="minus">
+            <rect>0, 500, 800, 100</rect>
+            <dest>dni20</dest>
+        </hotspot>
+        <hotspot cursor="grab">
+            <rect>180, 260, 90, 60</rect>
+            <cond>not Dni.switch</cond>
+            <action>flipswitch</action>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni22">
+        <file>dnichamber22.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni25b</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni23</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni24</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni23">
+        <file>dnichamber23.jpg</file>
+        <image>
+            <file>dnichamber23-ouvert.jpg</file>
+            <rect>0,0,800,600</rect>
+            <cond>Dni.switch</cond>
+        </image>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni22</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni24</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni25b</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni25</dest>
+        </hotspot>
+    </slide>
+
+    <slide id="dni24">
+        <file>dnichamber24.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni23</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni25b</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni22</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni17</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni25">
+        <file>dnichamber25.jpg</file>
+        <image>
+            <file>dnichamber25-ouvert.jpg</file>
+            <rect>0,0,800,600</rect>
+            <cond>Dni.switch</cond>
+        </image>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni24</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni22</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni23</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,85,492,403</rect>
+            <dest>dni29</dest>
+            <cond>Dni.switch</cond>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni25b">
+        <file>dnichamber25.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni27</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni28</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni26</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni26">
+        <file>dnichamber26.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni28</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni27</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni25</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni25b</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni27">
+        <file>dnichamber27.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni26</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni25</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni28</dest>
+        </hotspot>
+    </slide>
+
+    <slide id="dni28">
+        <file>dnichamber28.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni25</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni26</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni27</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni29">
+        <file>dnichamber29.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni32</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni30</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni31</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni30">
+        <file>dnichamber30.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni29</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni31</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni32</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni33</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni31">
+        <file>dnichamber31-ouvert.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni30</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni32</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni29</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni26</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni32">
+        <file>dnichamber32.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni31</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni29</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni30</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni33">
+        <file>dnichamber33.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni36</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni35</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni34</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni37</dest>
+        </hotspot>
+        <onentry>dni33_entry</onentry>
+    </slide>
+    
+    <slide id="dni34">
+        <file>dnichamber34.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni35</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni36</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni33</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni32</dest>
+        </hotspot>
+        <onentry>dni34_entry</onentry>
+    </slide>
+    
+    <slide id="dni35">
+        <file>dnichamber35.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni33</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni34</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni36</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni36">
+        <file>dnichamber36.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni34</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni33</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni35</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni37">
+        <file>dnichamber37.png</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni39</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni40</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni38</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni59</dest>
+        </hotspot>
+        <onentry>dni37_entry</onentry>
+        <!--<image id="dni37image">
+            <file>37_00000.png</file>
+            <rect>348,205,100,80</rect>
+        </image>-->
+    </slide>
+    
+    <slide id="dni38">
+        <file>dnichamber38.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni40</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni39</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni37</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni34</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni39">
+        <file>dnichamber39.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni38</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni37</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni40</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni53</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni40">
+        <file>dnichamber40.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni37</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni38</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni39</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni44</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni41">
+        <file>dnichamber41.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni43</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,180</rect>
+            <dest>dni44</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,230,100,270</rect>
+            <dest>dni44</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni42</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni56</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>742,180,58,50</rect>
+            <dest>dni59</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni42">
+        <file>dnichamber42.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni44</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni43</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni41</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni43">
+        <file>dnichamber43.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni42</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni41</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni44</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni38</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni44">
+        <file>dnichamber44.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni41</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni42</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni43</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni45</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni45">
+        <file>dnichamber45.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni47</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni46</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni48</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni46">
+        <file>dnichamber46.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni45</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni48</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni47</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni47">
+        <file>dnichamber47.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni48</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni45</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni46</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni49</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni48">
+        <file>dnichamber48.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni46</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni47</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni45</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni43</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni49">
+        <file>dnichamber49.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni51</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni52</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni50</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni50">
+        <file>dnichamber50.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni52</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni51</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni49</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni46</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni51">
+        <file>dnichamber51.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni50</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni49</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni52</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni54</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni52">
+        <file>dnichamber52.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni49</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni50</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni51</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni53">
+        <file>dnichamber53.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni56</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni55</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni54</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni52</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni54">
+        <file>dnichamber54.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni55</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni56</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni53</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni38</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni55">
+        <file>dnichamber55.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,180</rect>
+            <dest>dni53</dest>
+        </hotspot>
+        <hotspot cursor="left">
+            <rect>0,230,100,270</rect>
+            <dest>dni53</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni54</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni56</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni42</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>0,180,60,50</rect>
+            <dest>dni59</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni56">
+        <file>dnichamber56.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni54</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni53</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni55</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni57">
+        <file>dnichamber57.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni60</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni59</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni58</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni56</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni58">
+        <file>dnichamber58.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni59</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni60</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni57</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni42</dest>
+        </hotspot>
+    </slide>
+    
+    <slide id="dni59">
+        <file>dnichamber59.png</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni57</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni58</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni60</dest>
+        </hotspot>
+        <hotspot cursor="grab">
+            <rect>398,158,120,63</rect>
+            <action>runstory</action>
+        </hotspot>
+
+        <image id="dni59image">
+            <file>59_00000.png</file>
+            <rect>391,125,130,130</rect>
+        </image>
+    </slide>
+    
+    <slide id="dni60">
+        <file>dnichamber60.jpg</file>
+        <hotspot cursor="left">
+            <rect>0,0,100,500</rect>
+            <dest>dni58</dest>
+        </hotspot>
+        <hotspot cursor="right">
+            <rect>700,0,100,500</rect>
+            <dest>dni57</dest>
+        </hotspot>
+        <hotspot cursor="left180">
+            <rect>0,500,800,100</rect>
+            <dest>dni59</dest>
+        </hotspot>
+        <hotspot cursor="forward">
+            <rect>148,84,492,403</rect>
+            <dest>dni38</dest>
+        </hotspot>
+    </slide>
+</age>

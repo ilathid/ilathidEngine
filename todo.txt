@@ -1,0 +1,43 @@
+# TODO:
+Monday Oct 8
+########################
+- Memory Management
+- Music and Sounds
+
+########################
+Design decision: 
+In Parametes:
+    slide_size_3d    = (1024,1024)
+    slide_size_2d    = (800,600)
+    slide_2d_padding = (0,0,0,0) # top, bottom, left, right
+
+are used to map slide image coordinates ('rects' from the age editor) to 2d and 3d geoms. This means the engine expects all slide textures to be of the specified dimensions. There were several reasons for this decision:
+
+- it seems desirable that the age-editor and age .py files work in image-coordinates if they want to, as this is the most natural to game designers.
+- it was hard to come up with a good design in which geoms store the shape information in image-coordinate form. This is because, in order to convert an image-coord to a screen coordinate, any object had to know something about the size of the slide image which was used to generate the slide texture, and the area on the screen where the slide was being rendered. This would have required some kind of heirarchical render mechanism, I think, as the information is far removed:
+slide->texture->image coords
+slide->decides area where slide is rendered on screen
+slide->slide object->geom->renders a texture, using above info from the slide.
+
+The new design means that all coordinate conversion happens when the age is loaded. It wasn't desirable to read all 2d slide images to determine their size, so a standard size is used.
+
+########################
+- pull in fonts and text drawing from other code
+- would be nice to draw text onto textures, not just onto the screen.
+- so a page texture would first be from an image, and then have the text drawn onto the texture.
+  Does this make sense? Page textures are not typically reused in a single book anyway, so this isn't wastful of texture space.
+- For now, just drawing onto the screen is probably good.
+
+- think about grabbing and dragging: how does this work? What part manages this? Is this important?
+=== Solution: Make it so that objects can preform their own dragging logic using mousemotion and mouseclick events
+  
+- think about cursor management:
+ > cursor is reset every frame
+ > When each object is rendered, it needs to know if it still would like a specific cursor. If so, it should request it again.
+ > The last request on a frame is what the cursor will be drawn as.
+
+- think about memory management: loading slides, unloading slides
+
+- Music and Ambient Noises: See post online
+
+- Tie GameState conditions into things.

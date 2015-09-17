@@ -1,11 +1,81 @@
 import xml.dom.minidom
-from slide import slide
-from AoIimage import AoIimage
-from music import Music
-from movie import movie
+from Slide import Slide, Slide2d
+from Slide3d import Slide3d
+from Image import Image
+#from music import Music
+#from movie import movie
 from FilePath import FilePath
-from Slide3D import Slide3D
-import globals
+from Geometry import geomFromSide, img2scr, Geometry3d, Geometry2d
+from Archive import Archive
+from Parameters import Parameters
+from Logger import Logger
+
+import threading
+
+def unpackInts(node):
+    if node is not None and len(node) > 0:
+        _str = getText(node[0].childNodes)
+        if _str is not None and len(_str) > 0:
+            return map(lambda x: int(x), _str.split(","))
+    return []
+    
+def unpackGeom3d(node):
+    # Just a guess...
+    sides = "NESW"
+    
+    """ Returns a list of geoms, in case the rects span more than one face. """
+    geoms = []
+    rect_list = unpackInts(node)
+    hx = rect_list[0]
+    hy = rect_list[1]
+    hw = rect_list[2]
+    hh = rect_list[3]
+
+    side_start = int(hx/1024)
+    side_end = int((hx+hw)/1024)
+    
+    if side_start == side_end:
+        x1 = (hx % 1024) / 1024.0
+        x2 = ((hx+hw) % 1024) / 1024.0
+        y1 = 1.0 - hy / 1024.0
+        y2 = 1.0 - (hy+hh) / 1024.0
+        
+        geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
+    else:
+        x1 = (hx % 1024) / 1024.0
+        x2 = 1
+        y1 = hy / 1024.0
+        y2 = (hy+hh) / 1024.0
+        geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
+        
+        side_start = side_start + 1
+        while side_start < side_end:
+            x1 = 0
+            x2 = 1
+            y1 = hy / 1024.0
+            y2 = (hy+hh) / 1024.0
+            geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
+            side_start = side_start + 1
+        
+        x1 = 0
+        x2 = ((hx+hw) % 1024) / 1024.0
+        y1 = hy / 1024.0
+        y2 = (hy+hh) / 1024.0
+        
+        geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
+    return geoms    
+
+def unpackGeom2d(node):
+    """ Returns a list of geoms (only ever has one element) """
+    geoms = []
+    rect_list = unpackInts(node)
+    hx = rect_list[0]
+    hy = rect_list[1]
+    hw = rect_list[2]
+    hh = rect_list[3]
+
+    geoms.append(Geometry2d(img2scr([(hx,hy), (hx,hy+hh), (hx+hw,hy+hh), (hx+hw,hy)])))
+    return geoms
 
 def getText(nodelist):
     rc = []
@@ -14,18 +84,44 @@ def getText(nodelist):
             rc.append(node.data)
     return ''.join(rc)
 
-class age(object):
+class Age(object):
+    isLoaded = False    
+    
+    def __init__(self, ageName, arch, params, engine):
+        self.ageName = ageName
+        self.arch = arch
+        self.params = params
+        self.engine = engine
+        self._slides = {}
+        # self._movies = {}
+        # self._images = {}
+        # self._musics = {}
+        
+        # TODO: Age Slide Memory Management Thread
+        #self.t = threading.Thread(None, target=self._t_buffer)
+        self._blk  = threading.Semaphore(1)     
     
     # Crate an age from a XML file
     # filename : XML file describing the age
-    def __init__(self, filename, supertype):
-        self._filename = filename
-        self._slides = {}
-        self._movies = {}
-        self._images = {}
-        self._musics = {}
+    def loadXML(self):
+        """ Initializes the age data using an age.xml file in the root of the archive """
+        # Get the xml file from the archive
+        fpxml = FilePath("age.xml", self.arch)
         
-        xmlfile = xml.dom.minidom.parse(filename)
+        self._slides = {}
+        # self._movies = {}
+        # self._images = {}
+        # self._musics = {}
+        
+        # Threading for background memory management.
+        # TODO: Think and organize
+        #self.t = threading.Thread(None, target=self._t_buffer)
+        #self._blk  = threading.Semaphore(1)
+        
+        # Parse xml file
+        fpfile = fpxml.getFile()
+        xmlfile = xml.dom.minidom.parse(fpfile)
+        fpfile.close()
         
         if len(xmlfile.childNodes) != 1 or xmlfile.childNodes[0].localName != 'age':
             raise Exception("Age XML files must contain a single root element called 'age'")
@@ -33,56 +129,62 @@ class age(object):
         rootnode = xmlfile.childNodes[0]
         
         self._name = rootnode.getAttribute("name")
+        
+        # TODO: When a player asks to go to an age, and doesn't specify a slide, 
+        # maybe this can be used.
+        # Right now linking to ages requires age.slide, so that the target slide is
+        # always specified. So it may make sense to scrap this variable.
         self._firstSlide = rootnode.getAttribute("start")
-        #first_slide = rootnode.getAttribute("start")
         
         for node in rootnode.childNodes:
             if node.localName == "slide":
-                self._readslide(node, supertype)
-            elif node.localName == "music":
-                self._readmusic(node)
-            elif node.localName == "movie":
-                self._readmovie(node, supertype)
+                self._readslide(node)
+            # elif node.localName == "music":
+            #     self._readmusic(node)
+            # elif node.localName == "movie":
+            #     self._readmovie(node)
             elif node.localName is not None:
                 print "WARNING, Unknown XML node <%s> in age file" % node.localName
-                
+        
         #self._slides[first_slide].display()
+        self.loaded()
     
-    # Get the name of the slide where the player should start in this age
-    def getStartLocation(self):
-        return self._firstSlide
+    def loaded(self):
+        pass
+    
+    # # Get the name of the slide where the player should start in this age
+    # def getStartLocation(self):
+    #     return self._firstSlide
     
     # read a <slide> tag from the XML file and build a 'slide' object from it
-    def _readslide(self, node, supertype):
+    def _readslide(self, node):
         slideid = node.getAttribute("id")
         is3D = (node.getAttribute("is3D") == "true")
         
         if is3D:
             filenodes = [subnode for subnode in node.childNodes if subnode.localName == "file"]
             
-            filenames = []
-            archives = []
+            filepaths = []
             for filenode in filenodes:
-                filename = getText(filenode.childNodes)
-                filenames.append(filename)
+                filename = "slides/" + getText(filenode.childNodes)
                 
                 if filenode.hasAttribute('archive'):
-                    archive = filenode.getAttribute('archive')
+                    archive = Archive(filenode.getAttribute('archive'), self.params)
                 else:
-                    archive = None
-                archives.append(archive)
+                    archive = self.arch
+                filepaths.append(FilePath(filename, archive))
             
-            s = Slide3D(realname=slideid, filename=filenames, datfile=archives, encrypted=["0","0","0","0","0","0"])
+            s = Slide3d(slideid, '3d', filepaths)
         else:
             filenode = node.getElementsByTagName("file")[0]
-            filename = getText(filenode.childNodes)
+            filename = "slides/" + getText(filenode.childNodes)
             
             if filenode.hasAttribute('archive'):
-                archive = filenode.getAttribute('archive')
+                archive = Archive(filenode.getAttribute('archive'), self.params)
             else:
-                archive = None
+                archive = self.arch
             
-            s = slide(realname=slideid, filename=filename, datfile=archive)
+            s = Slide(slideid, "2d", FilePath(filename, archive))
         
         for subnode in node.childNodes:
             
@@ -92,74 +194,21 @@ class age(object):
             
             # Hotspot
             elif subnode.localName == "hotspot":
-                cursortype = subnode.getAttribute('cursor')
-                
-                destOrientation = 0
-                if subnode.hasAttribute('destOrientation'):
-                    destOrientation = subnode.getAttribute('destOrientation')
-                
-                rect_list = []
-                rect_node = subnode.getElementsByTagName('rect')
-                if rect_node is not None and len(rect_node) > 0:
-                    rect_str = getText(rect_node[0].childNodes)
-                    if rect_str is not None and len(rect_str) > 0:
-                        rect_list = map(lambda x: int(x), rect_str.split(","))
-                
-                polygon_list = []
-                polygon_node = subnode.getElementsByTagName('polygon')
-                if polygon_node is not None and len(polygon_node) > 0:
-                    polygon_str = getText(polygon_node[0].childNodes)
-                    if polygon_str is not None and len(polygon_str) > 0:
-                        polygon_list = map(lambda x: int(x), polygon_str.split(","))
-                        
-                destination_tags = subnode.getElementsByTagName('dest')
-                if len(destination_tags) == 1:
-                    dest_slide = getText(destination_tags[0].childNodes)
-                else:
-                    dest_slide = None
-                
-                action_tags = subnode.getElementsByTagName('action')
-                if len(action_tags) == 1:
-                    action_str = getText(action_tags[0].childNodes)
-                    action = lambda: getattr(supertype, action_str)(self)
-                else:
-                    action = None
-
-                if len(rect_list) == 4:
-                    hx = rect_list[0]
-                    hy = rect_list[1]
-                    hw = rect_list[2]
-                    hh = rect_list[3]
-                    
-                    # Check if the hotspot spans on more than one cube face. If so then split it to simplify
-                    # the math later
-                    img_start = int(hx/1024)
-                    img_end = int((hx + hw)/1024)
-    
-                    if img_start != img_end:
-                        s.attachhotspot((hx, hy, (img_start+1)*1024 - hx ,hh),
-                                        cursortype, keywords={'dest':dest_slide, 'action':action, 'destOrientation': int(destOrientation)})
-                        s.attachhotspot(((img_start+1)*1024, hy, hx + hw - (img_start+1)*1024, hh),
-                                        cursortype, keywords={'dest':dest_slide, 'action':action, 'destOrientation': int(destOrientation)})
-                    else:
-                        s.attachhotspot((hx, hy, hw, hh), cursortype,
-                                        keywords={'dest':dest_slide, 'action':action, 'destOrientation': int(destOrientation)})
-                else:
-                    # TODO: check if polygon spans more than 1 face
-                    s.attachhotspot(polygon_list, cursortype, mapType='polygon',
-                                    keywords={'dest':dest_slide, 'action':action, 'destOrientation': int(destOrientation)})
+                hotspot = self._readhotspot(subnode, s)
                     
             # On entrance
-            elif subnode.localName == "onentrance":
+            elif subnode.localName == "onentry":
+                # print "XML: Found onentry function " + str(getText(subnode.childNodes)) + ", will add to " + str(s)
                 onentrance_str = getText(subnode.childNodes)
-                onentrance_fn = lambda: getattr(supertype, onentrance_str)(self)
-                s.onentrance(onentrance_fn)
+                # onentrance_fn = lambda: getattr(self, onentrance_str)(self)
+                onentrance_fn = getattr(self, onentrance_str)
+                s.callbacks['entry'] = onentrance_fn
                 
             # On exit
             elif subnode.localName == "onexit":
                 onexit_str = getText(subnode.childNodes)
-                onexit_fn = lambda: getattr(supertype, onexit_str)(self)
-                s.onexit(onexit_fn)
+                onexit_fn = getattr(self, onexit_str)
+                s.callbacks['exit'] = onexit_fn
             
             # Slide 'image' (sprite)
             elif subnode.localName == "image":
@@ -171,82 +220,166 @@ class age(object):
             
             elif subnode.localName is not None:
                 raise Exception("Unknown XML element <%s> found under <slide>" % subnode.localName)
+                # print "Unknown XML element <%s> found under <slide>" % subnode.localName
                 
         self._slides[slideid] = s
         
+    def _readhotspot(self, node, s):
+        cursortype = node.getAttribute('cursor')
+        
+        destOrientation = 0
+        if node.hasAttribute('destOrientation'):
+            destOrientation = node.getAttribute('destOrientation')
+            
+        cond_string = None
+        cond_tags = node.getElementsByTagName('cond')
+        if len(cond_tags) == 1:
+            cond_string = getText(cond_tags[0].childNodes)
+        
+        rect_node = node.getElementsByTagName('rect')
+        if s.getType() == "3d":
+            geoms = unpackGeom3d(rect_node)
+        if s.getType() == "2d":
+            geoms = unpackGeom2d(rect_node)
+        
+        #polygon_list = []
+        #polygon_node = node.getElementsByTagName('polygon')
+        #polygon_list = unpackInts(polygon_node)
+                
+        destination_tags = node.getElementsByTagName('dest')
+        action_tags = node.getElementsByTagName('action')
+        if len(destination_tags) == 1:
+            dest_slide = getText(destination_tags[0].childNodes)
+            for geom in geoms:
+                h = self.engine.Hotspot(geom, dest=dest_slide, cursor=cursortype, dest_dir=(0, int(destOrientation)))
+                if cond_string is not None:
+                    h.setCondString(cond_string)
+                s.attachObject(h)
+        if len(action_tags) == 1:
+            action_str = getText(action_tags[0].childNodes)
+            action = lambda: getattr(self, action_str)()
+            for geom in geoms:
+                h = self.engine.Hotspot(geom, callback=action, cursor=cursortype)
+                if cond_string is not None:
+                    h.setCondString(cond_string)
+                s.attachObject(h)
+    
     # read an <image> tag from XML
     # node : the XML node to read from
     # s : the slide this <image> appears under
     def _readimage(self, node, s):
         img_id = node.getAttribute('id')
         filenode = node.getElementsByTagName("file")[0]
-        filename = getText(filenode.childNodes)
+        filename = "images/" + getText(filenode.childNodes)
         
         if filenode.hasAttribute('archive'):
-            archive = filenode.getAttribute('archive')
+            archive = Archive(filenode.getAttribute('archive'), self.params)
         else:
-            archive = None
+            archive = self.arch
+
+        cond_string = None
+        cond_tags = node.getElementsByTagName('cond')
+        if len(cond_tags) == 1:
+            cond_string = getText(cond_tags[0].childNodes)
         
-        rect_str = getText(node.getElementsByTagName('rect')[0].childNodes)
-        rect_list = map(lambda x: int(x), rect_str.split(","))
+        # rects need to be converted to an x/y/z coordinate based on:
+        # - the texture size (rects are in texture coordinates)
+        rect_node = node.getElementsByTagName('rect')
+        if s.getType() == "3d":
+            geoms = unpackGeom3d(rect_node)
+        if s.getType() == "2d":
+            geoms = unpackGeom2d(rect_node)
         
-        alpha_str = getText(node.getElementsByTagName('alpharef')[0].childNodes)
-        alpha_list = map(lambda x: int(x), alpha_str.split(","))
-        
-        # TODO: add encryption support
-        i = AoIimage(FilePath(filename, archive, 0), rect=(rect_list[0], rect_list[1]), slide=s,
-                     alpha=(alpha_list[0], alpha_list[1]))
-        
-        self._images[img_id] = i
+        if len(geoms) > 1:
+            raise Exception("Image must not span cube sides")            
+                
+        i = Image(geoms[0], FilePath(filename, archive))
+        if cond_string is not None:
+            i.setCondString(cond_string)
+        s.attachObject(i)
     
     # read a <music> tag from the XML file and build a 'Music' object from it
     def _readmusic(self, node):
-        musicid = node.getAttribute("id")
-        musictype = node.getAttribute("type")
-        
-        filenode = node.getElementsByTagName("file")[0]
-        filename = getText(filenode.childNodes)
-        
-        volnode = node.getElementsByTagName("volume")[0]
-        vol = float(getText(volnode.childNodes))
-        
-        m = Music(name=musicid, filename=filename, musictype=musictype, vol=vol)
-        self._musics[musicid] = m
-        
+        pass
+#        musicid = node.getAttribute("id")
+#        musictype = node.getAttribute("type")
+#        
+#        filenode = node.getElementsByTagName("file")[0]
+#        filename = getText(filenode.childNodes)
+#        
+#        volnode = node.getElementsByTagName("volume")[0]
+#        vol = float(getText(volnode.childNodes))
+#        
+#        m = Music(name=musicid, filename=filename, musictype=musictype, vol=vol)
+#        self._musics[musicid] = m
+#        
     # read a <movie> tag from the XML file and build a 'movie' object from it
-    def _readmovie(self, node, supertype):
-        movieid = node.getAttribute("id")
-        filenode = node.getElementsByTagName("file")[0]
-        filename = getText(filenode.childNodes)
-        
-        rect_str = getText(node.getElementsByTagName('rect')[0].childNodes)
-        rect_list = map(lambda x: int(x), rect_str.split(","))
-        
-        endfuncElems = node.getElementsByTagName("endfunc")
-        if len(endfuncElems) > 0:
-            endfunc_str = getText(endfuncElems[0].childNodes)
-            endfunc = lambda: getattr(supertype, endfunc_str)(self)
-        else:
-            endfunc = None
-            
-        m = movie(filename, (rect_list[0], rect_list[1], rect_list[2], rect_list[3]), endfunc=endfunc)
-        self._movies[movieid] = m
+    def _readmovie(self, node):
+        pass
+#        movieid = node.getAttribute("id")
+#        filenode = node.getElementsByTagName("file")[0]
+#        filename = getText(filenode.childNodes)
+#        
+#        rect_str = getText(node.getElementsByTagName('rect')[0].childNodes)
+#        rect_list = map(lambda x: int(x), rect_str.split(","))
+#        
+#        endfuncElems = node.getElementsByTagName("endfunc")
+#        if len(endfuncElems) > 0:
+#            endfunc_str = getText(endfuncElems[0].childNodes)
+#            endfunc = lambda: getattr(self.ageName, endfunc_str)(self)
+#        else:
+#            endfunc = None
+#            
+#        m = movie(filename, (rect_list[0], rect_list[1], rect_list[2], rect_list[3]), endfunc=endfunc)
+#        self._movies[movieid] = m
 
     # The name of this age
-    def getname(self):
-        return self._name
+    def getName(self):
+        return self.ageName
 
-    def getFileName(self):
-        return self._filename
-
-    def getslide(self, name):
-        if name in self._slides:
-            return self._slides[name]
-        else:
-            return globals.menuslides[name]
+    def getSlide(self, name):
+        return self._slides[name]
     
     def getAllSlides(self):
         return self._slides
     
-    def getMusic(self, musicid):
-        return self._musics[musicid]
+#    def getMusic(self, musicid):
+#        return self._musics[musicid]
+    
+    # Buffer Thread
+    def _t_start(self):
+        #if self.t.is_alive():
+        #    self.t.join()
+        #self.t.start()
+        pass
+    
+    def _t_buffer(self):
+        self._blk.acquire()
+        for slide in self._slides.values():
+            if slide.getName() in self.slds:
+                slide.makeBuffers()
+                Logger.log("Age: Loaded " + slide.getName())
+            else:
+                slide.clearBuffers()
+        self._blk.release()
+
+    # Given a set of slides the age should have preloaded, either load or unload slides as needed, using threading.        
+    def manageBuffers(self, slide_name):
+        if self.isLoaded: return
+        links = self.getSlide(slide_name).getLinks()
+        self._blk.acquire()
+        self.slds = []
+        for link in links:
+            parts = link.split(".")
+            if len(parts) == 1 and parts[0] in self._slides:
+                self.slds.append(parts[0])
+            if len(parts) == 2 and parts[0] == self.ageName and parts[1] in self._slides:
+                self.slds.append(parts[1])
+        self._blk.release()
+        self._t_start()
+        self.isLoaded = True
+        
+    def clearBuffers(self):
+        for slide in self._slides.values():
+            slide.clearBuffers()
+        self.isLoaded = False
