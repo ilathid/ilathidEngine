@@ -1,43 +1,59 @@
-# TODO:
-Monday Oct 8
-########################
-- Memory Management
-- Music and Sounds
+TODO
+====
+Design an audio mixer for ilathid.
+- any movie has an internal audio buffer created for it, for decoded audio
+- any audio file has the same
+- any music file has the same
 
-########################
-Design decision: 
-In Parametes:
-    slide_size_3d    = (1024,1024)
-    slide_size_2d    = (800,600)
-    slide_2d_padding = (0,0,0,0) # top, bottom, left, right
+Each of these has its own volume control.
+The audio mixer also has global audio control settings:
+- music volume
+- snd fx volume
+- voice volume
 
-are used to map slide image coordinates ('rects' from the age editor) to 2d and 3d geoms. This means the engine expects all slide textures to be of the specified dimensions. There were several reasons for this decision:
+Any audio file can be opened as belonging to one of these mixers
 
-- it seems desirable that the age-editor and age .py files work in image-coordinates if they want to, as this is the most natural to game designers.
-- it was hard to come up with a good design in which geoms store the shape information in image-coordinate form. This is because, in order to convert an image-coord to a screen coordinate, any object had to know something about the size of the slide image which was used to generate the slide texture, and the area on the screen where the slide was being rendered. This would have required some kind of heirarchical render mechanism, I think, as the information is far removed:
-slide->texture->image coords
-slide->decides area where slide is rendered on screen
-slide->slide object->geom->renders a texture, using above info from the slide.
+The SDL audio device is given one callback function in the audio mixer, which gets audio from all of these buffers and mixed them.
+I then have to hand-mix the audio and apply clipping.
 
-The new design means that all coordinate conversion happens when the age is loaded. It wasn't desirable to read all 2d slide images to determine their size, so a standard size is used.
+For now: no 3d-sound. store sound position, have function to shift position, store/update listener orientation (2 angles?), but only affect sound by distance attenuation. Later 3d-effects can be added.
 
-########################
-- pull in fonts and text drawing from other code
-- would be nice to draw text onto textures, not just onto the screen.
-- so a page texture would first be from an image, and then have the text drawn onto the texture.
-  Does this make sense? Page textures are not typically reused in a single book anyway, so this isn't wastful of texture space.
-- For now, just drawing onto the screen is probably good.
+3D
+==
+Audio files can optionally have a position: then I apply distance attenuation and do some sort of right/left mixing. ??
 
-- think about grabbing and dragging: how does this work? What part manages this? Is this important?
-=== Solution: Make it so that objects can preform their own dragging logic using mousemotion and mouseclick events
-  
-- think about cursor management:
- > cursor is reset every frame
- > When each object is rendered, it needs to know if it still would like a specific cursor. If so, it should request it again.
- > The last request on a frame is what the cursor will be drawn as.
+- audio on the right should be louder on the right speaker
+- the extent of this depends on how close the audio is to the listener.
+> very distant, max out at about 50% difference
+> very close, difference approachs inf, ie 0 to max volume
+> need to decide on a distance that is associated with 
 
-- think about memory management: loading slides, unloading slides
+			a is stronger
+			
 
-- Music and Ambient Noises: See post online
+				    a is not as weak
 
-- Tie GameState conditions into things.
+	a is strong	a|b		a is weak
+
+On the left, audio follows a simple distance attenuation, with inf volume at a distance of 0. normal volume at a distance of 1 (?)
+On the right, audio is reduced half, and then a distance attenuation is applied (?)
+
+Up and Down: same as at 90 deg from ear
+
+
+TALK
+====
+SDL_MixAudioFormat(stream, mixData, deviceFormat, len, SDL_MIX_MAXVOLUME / 2);
+void SDL_AudioCallback(void*  userdata,
+                       Uint8* stream,
+                       int    len)
+
+http://jcatki.no-ip.org:8080/SDL_mixer/SDL_mixer_frame.html
+
+READING VIDEO AND AUDIO FILES
+=============================
+Video, Music: only open a file pointer, and stream the data directly to the audio mixer buffer
+Audio: read the entire (ogg) audio file into memory, and decode it and play it on the fly.
+
+- Don't need seek for now. Movies, music and audio are played from the beginning. They can be paused, but can't be loaded mid-stream.
+- To start with, I will just write a player that assumes there is no video.

@@ -19,7 +19,7 @@ void _init_values_mp(MediaPlayer *mp){
     mp->filepath = NULL;
     mp->vstream = NULL;
     mp->astream = NULL;
-    mp->thread = NULL;
+    //mp->thread = NULL;
     mp->conv = NULL;
     mp->tstate = 0;
     mp->event = MP_EVENT_NONE;
@@ -43,7 +43,7 @@ int init_mp(MediaPlayer *mp, char *filepath){
     // initialize values
     _init_values_mp(mp);
     
-    mp->outbuf_size = AVCODEC_MAX_AUDIO_FRAME_SIZE + ALIBRARY_AUDIO_SIZE;
+    mp->outbuf_size = MAX_AUDIO_FRAME_SIZE + ALIBRARY_AUDIO_SIZE;
     mp->outbuf = (short int *)malloc(sizeof(short int)*(mp->outbuf_size));
     mp->outbuf_len = 0;
     
@@ -257,7 +257,7 @@ int _pread_mp(MediaPlayer *mp, int apackets, int vpackets){
             //av_dup_packet(&p);
             //av_free_packet(&p);
             //continue;
-            //printf("pts: %ld\n", (long int)p.dts);
+            //printf("pts: %ld\n", (long int)p.pts);
             
             // av_dup_packet(&p)
             // Create a reference to the packet's internal memory
@@ -276,7 +276,7 @@ int _pread_mp(MediaPlayer *mp, int apackets, int vpackets){
                 }
             else{
                 av_free_packet(&p);
-                p.dts = -1;
+                p.pts = -1;
                 //printf(" DD\n");
                 continue;
                 }
@@ -291,7 +291,7 @@ int _pread_mp(MediaPlayer *mp, int apackets, int vpackets){
             //bufp->data = dat;
             //printf("%d: D2 %u\n", cnt, bufp->data);
             
-            //printf("pts2: %d\n", bufp.dts)
+            //printf("pts2: %d\n", bufp.pts)
             
             // Make sure packet has its own memory
             if(av_dup_packet(bufp)){
@@ -305,7 +305,7 @@ int _pread_mp(MediaPlayer *mp, int apackets, int vpackets){
             }
         else{
             // av_free_packet(&p);
-            // p->dts = 0;
+            // p->pts = 0;
             //printf("Failed to read... eof?\n");
             //TODO eof should only need to be tested once, then some flag should be set
             break;
@@ -354,7 +354,7 @@ void _processVideo_mp(MediaPlayer *mp){
         p->data += dlen; // # pointer arithmatic?
         
         if (is_frame){
-            // printf("Frame pts, pkt_pts, pkt_dts: %d, %d, %d\n", f->dts, f->pkt_pts, f->pkt_dts);
+            // printf("Frame pts, pkt_pts, pkt_pts: %d, %d, %d\n", f->pts, f->pkt_pts, f->pkt_pts);
             // TODO consider not using avpicture, i just use it as a container anyway.
             avpicture_alloc(&temp_pic, 2, f->width, f->height);
             
@@ -389,7 +389,7 @@ void _processVideo_mp(MediaPlayer *mp){
     av_free(f);
     // free(f);
     av_free_packet(p);
-    p->dts = -1;
+    p->pts = -1;
     }
 
 void setVolMono_mp(MediaPlayer *mp, float vol){
@@ -448,7 +448,7 @@ void _processAudio_mp(MediaPlayer *mp){
         outsized = mp->outbuf_size - mp->outbuf_len;
         //printf("outsized %d (%d, %d)\n", outsized, mp->outbuf_size, mp->outbuf_len);
         dlen = avcodec_decode_audio3(mp->astream->codec, &(mp->outbuf[mp->outbuf_len]), &outsized, p);
-        // printf(" PACKET(A): %d\n", p->dts);
+        // printf(" PACKET(A): %d\n", p->pts);
         if (dlen < 0){
             //printf("Failed to decode audio %d\n", dlen);
             *p = orig;
@@ -481,7 +481,7 @@ void _processAudio_mp(MediaPlayer *mp){
     *p = orig;
     // printf("-> %d\n", p->size);
     av_free_packet(p);
-    p->dts = -1;
+    p->pts = -1;
     }
     
 int hasAudio_mp(MediaPlayer *mp){
@@ -621,13 +621,13 @@ void interrupt_mp(MediaPlayer *mp){
         mp->event = MP_EVENT_PAUSE;
         pthread_join(mp->thread, NULL);
         }
-    mp->thread = NULL;
+    // mp->thread = NULL;
 }
 
 // convert to milliseconds
-int _correctPts_mp(AVStream *stream, int pts){
+LONG _correctPts_mp(AVStream *stream, LONG pts){
     if (pts == -1) return -1;
-    // printf("pts: %d; corrected: %d\n", pts, (stream->time_base.num * pts) / (stream->time_base.den/1000));
+    //printf("pts: %lld; corrected: %lld\n", pts, (stream->time_base.num * pts) / (stream->time_base.den/1000));
     return (stream->time_base.num * pts) / (stream->time_base.den/1000);
     }
 
@@ -635,21 +635,23 @@ int _correctPts_mp(AVStream *stream, int pts){
  *  Assumes mpstate=1 on entry.
  */
 void *_playbackLoop_mp(MediaPlayer *mp){
-    int tim, nexta, nextv, sleep_time;
+    int tim, nexta, nextv, sleep_time, atime;
     
-    // fix first dts issue
-    int firstdts = -1;
+    // fix first pts issue
+    LONG firstpts = -1;
     if(mp->vstream != NULL)
-        firstdts = _correctPts_mp(mp->vstream, mp->vstream->first_dts);
+        firstpts = _correctPts_mp(mp->vstream, mp->vstream->start_time);
     if(mp->astream != NULL)
-        if(firstdts == -1 || mp->astream->first_dts < firstdts)
-            firstdts = _correctPts_mp(mp->astream, mp->astream->first_dts);
-    
+        if(firstpts == -1 || mp->astream->start_time < firstpts)
+            firstpts = _correctPts_mp(mp->astream, mp->astream->start_time);
+
     // set med timers according to pauseTime
+    //if(mp->pauseTime <= 0) printf("First:%d\n",firstpts);
+    //if(mp->pauseTime > 0) printf("Pause:%d\n",mp->pauseTime);
     if (mp->pauseTime > 0)
         startTimer_th(&mp->playTimer, mp->pauseTime);
     else
-        startTimer_th(&mp->playTimer, firstdts);
+        startTimer_th(&mp->playTimer, firstpts);
 
     // reset pauseTime for next time
     mp->pauseTime = 0;
@@ -667,6 +669,7 @@ void *_playbackLoop_mp(MediaPlayer *mp){
         
         // get smallest upcoming pts
         tim = getPlaybackTime_mp(mp);
+        atime = atime_ad(&mp->device);
         nexta = -1;
         nextv = -1;
         if (mp->astream != NULL)
@@ -674,17 +677,18 @@ void *_playbackLoop_mp(MediaPlayer *mp){
         if (mp->vstream != NULL)
             nextv = _correctPts_mp(mp->vstream, nextPts_pb(&mp->vbuffer));
     
-        // printf("pbt %d; t %d pts(%d, %d); diff to audio time %d\n", tim, tim+mp->startTime, nexta, nextv, nexta - tim + atime_ad(&mp->device));
+        //printf("pbt %d; t %d pts(%d, %d); diff to audio time %d\n", tim, tim+mp->startTime, nexta, nextv, nexta - tim + atime_ad(&mp->device));
         //printf("nexta, nextv; tim: %d, %d; %d\n", nexta, nextv, tim);
-        // printf("atime %d\n", atime_ad(&mp->device));
+        //printf("atime %d, %d\n", atime, nexta - (tim + atime));
         
         if (nextv == -1 && nexta == -1){
             mp->event = MP_EVENT_EOF; // interrupt
-            printf("Can't find a valid dts packet => EOF\n");
+            printf("Can't find a valid pts packet => EOF\n");
             }
         else if(nextv == -1 || (nexta != -1 && nexta < nextv)){
              // time until audio
-            if(nexta  < 25 + tim + atime_ad(&mp->device))
+            if(atime > 75) sleep_time = 50;
+            else if(nexta - (tim + atime) < 25)
                 _processAudio_mp(mp);
             else{
                 //printf("Audio left: %d\n", atime_ad(&mp->device));
@@ -705,7 +709,7 @@ void *_playbackLoop_mp(MediaPlayer *mp){
         // sleep as needed
         if (sleep_time > 3){
             //printf("Sleeping %d...\n",sleep_time - 3);
-            h_sleep((sleep_time - 3)*1000);
+            h_sleep((sleep_time - 3));
             }
         if (sleep_time < 0){
             mp->event = MP_EVENT_EOF; // interrupt
@@ -716,7 +720,7 @@ void *_playbackLoop_mp(MediaPlayer *mp){
         if(mp->event == MP_EVENT_EOF && mp->looping == 1){
             //printf("Looping\n");
             reset_mp(mp);
-            startTimer_th(&mp->playTimer, firstdts);
+            startTimer_th(&mp->playTimer, firstpts);
             mp->event = MP_EVENT_NONE;
             }
         }

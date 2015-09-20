@@ -2,6 +2,7 @@
 #define ALIBRARY_H
 
 #include <stdio.h>
+#include "timehelper.h"
 #include "ao/ao.h"
 #include <pthread.h>
 #include <math.h>
@@ -13,19 +14,14 @@ typedef struct {
     unsigned int byterate;
     ao_device *device;
     ao_sample_format fmt;
-    unsigned int nsstart; // when did the current sound data start playing?
-    unsigned int nsdelta; // how much sound (in time) has been put on the buffer since 
-
+    unsigned int msBuffer; // when did the current sound data start playing?
+    thTimer msTimer; // how much sound (in time) has been put on the buffer since
     //volume and such
     unsigned char voll;     // also used for mono
     unsigned char volr;
     // length of an audio sample
     int len;
-    
 } ADevice;
-
-
-
 
 // audio on buffer = nsstart + nsdelta - h_time() 
 

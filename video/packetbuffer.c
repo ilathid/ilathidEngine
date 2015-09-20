@@ -9,7 +9,7 @@ void init_pb(PacketBuffer *pb){
     pb->maxSize = 600;
     // I depend on empty packets having 0 pts
     for(i = 0; i < pb->maxSize; i++){
-        pb->packets[i].dts = -1;
+        pb->packets[i].pts = -1;
         }
     }
 
@@ -65,9 +65,9 @@ AVPacket *getRead_pb(PacketBuffer *pb){
  *  An assumption is made here that the smallest pts is on one of the oldest
  *  4 packets on the buffer.
  */
-int nextPts_pb(PacketBuffer *pb){
+LONG nextPts_pb(PacketBuffer *pb){
     // Return the newest packet on the buffer
-    int pts = -1;
+    LONG pts = -1;
     int temp = 16;
     int i;
     int ind;
@@ -75,13 +75,13 @@ int nextPts_pb(PacketBuffer *pb){
         if (pb->size < 16) temp = pb->size;
         ind = (pb->r_i) % pb->maxSize;
         i = (ind + temp) % pb->maxSize; 
-        if(pb->packets[ind].dts >= 0)
-            pts = pb->packets[ind].dts;
-        //printf(".%d", pb->packets[ind].dts);
+        if(pb->packets[ind].pts >= 0)
+            pts = pb->packets[ind].pts;
+        //printf(".%lld,%lld ", pb->packets[ind].pts, pb->packets[ind].pts);
         for (ind ++; ind != i; ind = (ind + 1) % pb->maxSize){
-            temp = pb->packets[ind].dts;
+            temp = pb->packets[ind].pts;
             if (temp >= 0 && (pts == -1 || temp < pts)) pts = temp;
-            //printf(".%d", pb->packets[ind].dts);
+            //printf(".%d", pb->packets[ind].pts);
             }    
         }
     else{
@@ -136,7 +136,7 @@ void clear_pb(PacketBuffer *pb){
     //printf("size: %d\n", pb->size);
     for(ind = 0; ind < pb->size; ind++){
         av_free_packet(&pb->packets[(pb->r_i + ind) % pb->maxSize]);
-        pb->packets[(pb->r_i + ind) % pb->maxSize].dts = -1;
+        pb->packets[(pb->r_i + ind) % pb->maxSize].pts = -1;
         }
     pb->size = 0;
     pb->r_i = 0;
