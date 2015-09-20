@@ -5,16 +5,14 @@ void init_ad(ADevice *ad, int bytes, int channels, int rate){
     int driver;
     int res;
     
-    ad->nsstart = 0;
-    ad->nsdelta = 0;
-    
-    ad->opened = 0;
+    ad->msBuffer = 0; // time on the buffer
+    startTimer_th(&(ad->msTimer),0);
 
+    ad->opened = 0;
     ad->voll = 128; // default median volume
     ad->volr = 128; // default median volume
 
     driver = ao_default_driver_id();
-
     ad->fmt.bits = bytes*8;
     ad->fmt.channels = 2; // I just always convert
     ad->fmt.rate = rate;
@@ -33,15 +31,13 @@ void init_ad(ADevice *ad, int bytes, int channels, int rate){
     printf("channels: %d\n", ad->fmt.channels);
     printf("rate: %d\n", ad->fmt.rate);
     printf("byte format: %d\n", ad->fmt.byte_format);
-    printf("matrix: %d\n", (int)ad->fmt.matrix);
+    printf("matrix: %d\n", (int)(long long)ad->fmt.matrix);
     
     // how many bytes per second does the device play?
     ad->byterate = ad->fmt.channels * ad->fmt.bits * ad->fmt.rate / (8);
     printf("\nbyterate: %d\n", ad->byterate);
     
     ao_sample_format fmt = ad->fmt;
-    
-    
     
     ad->device = ao_open_live(driver, &fmt, NULL); // # get device pointer
     if(ad->device != NULL){
@@ -68,13 +64,9 @@ void setVol_ad(ADevice *ad, float voll, float volr){
 /** How long until the device has played all of its current buffer?
  */
 int atime_ad(ADevice *ad){
-    int ret;
-    unsigned int ti = h_time();
-    if (ad->nsstart + ad->nsdelta < ti)
-        ret = 0;
-    else
-        ret = ad->nsstart + ad->nsdelta - ti;
-    return ret/1000;
+    int ret = ad->msBuffer - getTime_th(&(ad->msTimer));
+    ret = ret & ~(ret >> 31); // force positive
+    return ret;
     }
 
 void adjustSample_ad(ADevice *ad, char *data, int len){
@@ -141,25 +133,25 @@ void play_ad(ADevice *ad, char *data, int len){
         printf("Device not open!\n");
         return;
         }
-
-    unsigned int ti = h_time();
+    
+    int bufTime = atime_ad(ad);
     
     // 90 milliseconds limit
-    if(ad->nsstart + ad->nsdelta > 90000 + ti){
-        printf("play_ad: Error: Too much audio on buffer %u, %u\n", ad->nsstart + ad->nsdelta, 90000 + ti);
+    if(bufTime > 90){
+        printf("play_ad: Error: Too much audio on buffer %u\n", bufTime);
         return;
         }
     
-    if (ad->nsstart + ad->nsdelta < ti){
-        ad->nsstart = ti;
-        ad->nsdelta = 0;
-        // printf("RAN OUT\n");
+    if (bufTime == 0){
+        startTimer_th(&(ad->msTimer),0);
+        ad->msBuffer = 0;
+        printf("RAN OUT\n");
     }
     
-    // printf("Added %d millisec (%d bytes), to be played at time %d\n", (1000000 * len) / ad->byterate, len, ad->nsstart + ad->nsdelta);
+    //printf("Added %d millisec (%d bytes)\n", (1000 * len) / ad->byterate, len);
 
     //printf(" %d", len);
-    ad->nsdelta += (len*1000000) / ad->byterate; // round down
+    ad->msBuffer += (len*1000) / ad->byterate; // round down
     
     adjustSample_ad(ad, data, len);
     
@@ -185,6 +177,5 @@ void initialize_al(void){
     }
 
 void shutdown_al(void){
-    ao_shutdown();    
-
+    ao_shutdown();
     }

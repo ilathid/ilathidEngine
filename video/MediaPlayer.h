@@ -15,6 +15,8 @@
 #include "alibrary.h"
 #include "packetbuffer.h"
 
+#define MAX_AUDIO_FRAME_SIZE 192000 // 1 second of 48khz 32bit audio
+
 typedef enum {
     MP_EVENT_NONE,
     MP_EVENT_PAUSE,
@@ -87,7 +89,7 @@ int getVidWidth_mp(MediaPlayer *mp);
 int getVidHeight_mp(MediaPlayer *mp);
 int _pread_mp(MediaPlayer *mp, int apackets, int vpackets);
 void *_playbackLoop_mp(MediaPlayer *mp);
-int _correctPts_mp(AVStream *stream, int pts);
+LONG _correctPts_mp(AVStream *stream, LONG pts);
 void _processAudio_mp(MediaPlayer *mp);
 void _processVideo_mp(MediaPlayer *mp);
 

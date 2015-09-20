@@ -14,7 +14,7 @@ int main(int argc, char **argv){
     
     
     printf("Initialized the sound module.\n");
-    init_mp(&mp, "mus.mp3");
+    init_mp(&mp, "test.mp3");
     //init_mp(&mp2, "void.mpg");
     //init_mp(&mp3, "wall.mpg");
     // init_mp(&mp, "rocks.mpg");

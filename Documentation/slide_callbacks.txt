@@ -25,7 +25,7 @@ in xml:
    <onentry>somefunc</onentry>
 </slide>
 
-in Dni.py:
+or in Dni.py:
 
 def init(self):
     ...
