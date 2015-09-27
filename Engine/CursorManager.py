@@ -40,7 +40,7 @@ class CursorManager:
     def addCursor(self, filepath, name, hotspot):
         """ hotspot is position of hotspot in cursor """
         pygame.mouse.set_visible(False)
-        fio = filepath.getFile()
+        fio = filepath.open()
         tex = GLTexture()
         tex.imageTexture(fio, alpha=True) # Passing a file-like object        
         (w,h) = tex.size
@@ -90,7 +90,6 @@ class CursorManager:
             geom = Geometry2d([(x1,y1),(x1,y2),(x2,y2),(x2,y1)], pos=pos)
             CursorManager.pos = pos
             CursorManager.geom = geom
-            
             geom.renderTexture(tex)
         
         # reset each frame

@@ -72,8 +72,11 @@ class Hotspot(SlideObject):
             if event.type == pygame.locals.MOUSEBUTTONUP and self.click and event.button == 1 and TestPoint(self.geom, event.pos):
                 self.click(event.pos)
                 events.remove(event)
-            if event.type == pygame.locals.MOUSEMOTION and (self.enter or self.leave):
-                self.passMouseMove(event.pos)
+            # if event.type == pygame.locals.MOUSEMOTION and (self.enter or self.leave):
+            #     print event.pos
+        if self.enter or self.leave:
+            # print CursorManager.getPosition()
+            self.passMouseMove(CursorManager.getPosition())
     
     def passMouseMove(self, pos):
         if not self._entered and TestPoint(self.geom, pos):
@@ -126,7 +129,7 @@ class EngineHotspot(Hotspot):
      
     def cursorEnter(self, pos):
         self.hovering = True
-        #print "Enter"
+        print "Enter"
 
     def cursorLeave(self, pos):
         self.hovering = False

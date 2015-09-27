@@ -10,7 +10,7 @@ class Image(SlideObject):
     
     def makeBuffers(self):
         if self.isLoaded: return
-        fio = self.filepath.getFile()
+        fio = self.filepath.open()
         self.tex = GLTexture()
         self.tex.imageTexture(fio, alpha=True) # Passing a file-like object        
         fio.close()

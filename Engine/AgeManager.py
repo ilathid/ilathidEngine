@@ -22,7 +22,7 @@ class AgeManager:
     def loadAge(self, ageName):
         # Use parameters
         params = {"type":Parameters.age_type, "file_loc":Parameters.age_folder}
-        arch = Archive(ageName, params)
+        arch = Archive(ageName, params['file_loc'])
         
         # the .py files need to be somewhere on the path, all together
         exec """from $AGE.$AGE import $AGE

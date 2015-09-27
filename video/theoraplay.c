@@ -6,45 +6,6 @@
  *  This file written by Ryan C. Gordon.
  */
 
-/**
- * I want to change this quite a bit!!!
- * - only 2 video frames, pre-allocated. When it is time to process a new frame, the oldest frame is updated, and the frames are swapped
- * - I would like to use a fixed-length audio buffer using a circular array (?)
- * - I would like an internal timer, which reads a new video frame when the current frame expires. The timer sleeps to specificall this time (within reason). Any in-between audio data is buffered as it arrives.
- * - play & pause functions
- * - data (memory) io
- * - option to trigger a callback when a video frame is ready. Consequences:
- *  > the decoder thread will take up the work of processing the video data and sending to OpenGL. May not leave enough performance to decode well.
- *  > althernative is for some other thread to call a get_video function, which simply gets the current video frame.
- * 
- * Media: written in C only
- *  > file or memory data
- *  > play, pause, 'seek'
- * Audio Channel: written in C only
- *  > get_audio (callback)
- *  > class
- *  > Media *
- * Mixer: written in C only
- *  > add_class (string)
- *  > remove_class (string)
- *  > set_class_volume (string)
- *  > set_master_volume (string)
- *  > SDL spec callback: mix all audio_channels according to class volume, and return to SDL audio
- * 
- * Control:
- *  > game wants to create a new audio file
- *    > calls to Media, audio/video is created with options
- *    > Media is passed the mixer (?), creates a new Audio Channel (through the mixer), with itself as the callback
- *      > Option 1: Media is passed a reference to video callback function (as a python function). Will call this function when a new video frame is ready. The function will be in GLTexture, to update a texture with the video data
-        > Option 2: No callback function is given, but the current video frame can be accessed by get_video function at any time.
- *  > sdl spec needs more audio, calls spec callback in mixer
- *    > mixer call get_audio for all audio channels
- *      > these in turn get audio from associated Media files
- *    > mixer mixes audio and returns
- * 
- * Parameters.menu.mixer_classes = {"sfx","music","dictation"} etc, whitelist of adjustable audio classes. All others will init to 100
- */
-
 // I wrote this with a lot of peeking at the Theora example code in
 //  libtheora-1.1.1/examples/player_example.c, but this is all my own
 //  code.
@@ -820,6 +781,18 @@ void THEORAPLAY_freeAudio(const THEORAPLAY_AudioPacket *_item)
     } // if
 } // THEORAPLAY_freeAudio
 
+// ADDED BY MATTHEW
+const THEORAPLAY_VideoFrame *THEORAPLAY_peekVideo(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    VideoFrame *retval;
+
+    Mutex_Lock(ctx->lock);
+    retval = ctx->videolist;
+    Mutex_Unlock(ctx->lock);
+
+    return retval;
+} // THEORAPLAY_getVideo
 
 const THEORAPLAY_VideoFrame *THEORAPLAY_getVideo(THEORAPLAY_Decoder *decoder)
 {

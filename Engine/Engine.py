@@ -26,6 +26,10 @@ class Engine:
     def gotoSlide(self, slide):
         Logger.log("Goto <i>" + str(slide) + "</i>")
         s = self.slide_manager.setSlide(slide)
+
+    def gotoAge(self, age):
+        Logger.log("Goto Age <i>" + str(age) + "</i>")
+        s = self.slide_manager.setAge(age)
         
     def __init__(self):
         self.age_manager = AgeManager(self)
@@ -69,12 +73,12 @@ class Engine:
         GLManager.init(Parameters.windowsize)
         
         # Cursors
-        arch = Archive("EngineData", {"type":"file", "file_loc":"Data"})
+        arch = Archive("EngineData", "Data")
         
         # Add cursors: cursor name, cursor file, click hotspot
         cursors = []
-        cursors.append(('forward','fwd.png',(7,2)))
         cursors.append(('grab','grab.png',(7,7)))
+        cursors.append(('forward','fwd.png',(7,2)))
         cursors.append(('down','down.png',(5,15)))
         cursors.append(('fist','fist.png',(7,7)))
         cursors.append(('left','left.png',(1,5)))

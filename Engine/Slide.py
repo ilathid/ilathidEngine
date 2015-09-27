@@ -57,7 +57,7 @@ class Slide(Grabbable):
         
         # Turn the file into data
         tex_file = self.slide_tex_files[0]
-        file_io = tex_file.getFile()
+        file_io = tex_file.open()
         self.tex = GLTexture()
         self.tex.imageTexture(file_io, alpha=None)
 

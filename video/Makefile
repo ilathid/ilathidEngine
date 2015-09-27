@@ -2,6 +2,9 @@ CC=cc
 CFLAGS=-fno-strict-aliasing -O2 -pipe -fno-strict-aliasing -DNDEBUG -O2 -pipe -fno-strict-aliasing -fPIC -I. -I/usr/local/include -I/usr/local/include/python2.7 -g2 -Wformat
 DEPS = MediaPlayer.h alibrary.h timehelper.h packetbuffer.h
 
+mixer.o: mixer.c
+	cc -I/usr/local/include/SDL -c mixer.c -o mixer.o
+
 test: test.o packetbuffer.o alibrary.o timehelper.o MediaPlayer.o
 	$(CC) $(CFLAGS) test.o packetbuffer.o alibrary.o timehelper.o MediaPlayer.o -L. -L/usr/local/lib -lm -lavutil -lavformat -lavcodec -lswscale -lao -lpthread -lrt -o test
 

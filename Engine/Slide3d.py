@@ -42,7 +42,7 @@ class Slide3d(Slide):
             # Turn the file into data
             geom = geomFromSide(side)
             
-            file_io = tex_file.getFile()
+            file_io = tex_file.open()
             tex = GLTexture()
             tex.imageTexture(file_io, alpha=None)
             file_io.close()
@@ -55,13 +55,13 @@ class Slide3d(Slide):
 
         if not self.grabbing:
             if keystate[pygame.locals.K_LEFT]:
-                GLManager.viewRotate(0, -200*dt)
+                GLManager.viewRotate(0, -100*dt)
             if keystate[pygame.locals.K_RIGHT]:
-                GLManager.viewRotate(0, 200*dt)
+                GLManager.viewRotate(0, 100*dt)
             if keystate[pygame.locals.K_DOWN]:
-                GLManager.viewRotate(-200*dt, 0)
+                GLManager.viewRotate(-100*dt, 0)
             if keystate[pygame.locals.K_UP]:
-                GLManager.viewRotate(200*dt, 0)
+                GLManager.viewRotate(100*dt, 0)
         if len(events) == 0:
             return
         
@@ -91,7 +91,7 @@ class Slide3d(Slide):
         dry = pos[0] - grab_pos[0]
         # self.drag_pos = pos
         CursorManager.lockPosition(grab_pos)
-        GLManager.viewRotate(-drx/3, dry/3)
+        GLManager.viewRotate(-drx/12.0, dry/12.0)
     
     # 3d grab release
     def release(self, pos):

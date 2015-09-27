@@ -7,730 +7,762 @@
  */
 
 /*
- * This is meant to be a big, robust test case that handles lots of strange
- *  variations. If you want a dirt simple version, try sdlsimple.c
- */
+
+Changes:
+- would like to NOT have a worker loop for decoding
+- would like to have a function to decode audio/video until we get a new video frame
+- the media player will have timers and a loop to grab one video frame at a time
+
+*/
+
+
+// I wrote this with a lot of peeking at the Theora example code in
+//  libtheora-1.1.1/examples/player_example.c, but this is all my own
+//  code.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <assert.h>
 
-#define GL_GLEXT_LEGACY 0
-#define GL_GLEXT_PROTOTYPES 1
-#ifdef __APPLE__
-#include <OpenGL/gl.h>
+#ifdef _WIN32
+#include <windows.h>
+#define THEORAPLAY_THREAD_T    HANDLE
+#define THEORAPLAY_MUTEX_T     HANDLE
+#define sleepms(x) Sleep(x)
 #else
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include <pthread.h>
+#include <unistd.h>
+#define sleepms(x) usleep((x) * 1000)
+#define THEORAPLAY_THREAD_T    pthread_t
+#define THEORAPLAY_MUTEX_T     pthread_mutex_t
 #endif
 
 #include "theoraplay.h"
-#include "SDL.h"
+#include "theora/theoradec.h"
+#include "vorbis/codec.h"
 
-static Uint32 baseticks = 0;
+#define THEORAPLAY_INTERNAL 1
 
-typedef struct AudioQueue
+typedef THEORAPLAY_VideoFrame VideoFrame;
+typedef THEORAPLAY_AudioPacket AudioPacket;
+
+// !!! FIXME: these all count on the pixel format being TH_PF_420 for now.
+
+typedef unsigned char *(*ConvertVideoFrameFn)(const th_info *tinfo,
+                                              const th_ycbcr_buffer ycbcr);
+
+static unsigned char *ConvertVideoFrame420ToYUVPlanar(
+                            const th_info *tinfo, const th_ycbcr_buffer ycbcr,
+                            const int p0, const int p1, const int p2)
 {
-    const THEORAPLAY_AudioPacket *audio;
-    int offset;
-    struct AudioQueue *next;
-} AudioQueue;
-
-static volatile AudioQueue *audio_queue = NULL;
-static volatile AudioQueue *audio_queue_tail = NULL;
-
-static void SDLCALL audio_callback(void *userdata, Uint8 *stream, int len)
-{
-    // !!! FIXME: this should refuse to play if item->playms is in the future.
-    //const Uint32 now = SDL_GetTicks() - baseticks;
-    Sint16 *dst = (Sint16 *) stream;
-
-    while (audio_queue && (len > 0))
-    {
-        volatile AudioQueue *item = audio_queue;
-        AudioQueue *next = item->next;
-        const int channels = item->audio->channels;
-
-        const float *src = item->audio->samples + (item->offset * channels);
-        int cpy = (item->audio->frames - item->offset) * channels;
-        int i;
-
-        if (cpy > (len / sizeof (Sint16)))
-            cpy = len / sizeof (Sint16);
-
-        for (i = 0; i < cpy; i++)
-        {
-            const float val = *(src++);
-            if (val < -1.0f)
-                *(dst++) = -32768;
-            else if (val > 1.0f)
-                *(dst++) = 32767;
-            else
-                *(dst++) = (Sint16) (val * 32767.0f);
-        } // for
-
-        item->offset += (cpy / channels);
-        len -= cpy * sizeof (Sint16);
-
-        if (item->offset >= item->audio->frames)
-        {
-            THEORAPLAY_freeAudio(item->audio);
-            free((void *) item);
-            audio_queue = next;
-        } // if
-    } // while
-
-    if (!audio_queue)
-        audio_queue_tail = NULL;
-
-    if (len > 0)
-        memset(dst, '\0', len);
-} // audio_callback
-
-
-static void queue_audio(const THEORAPLAY_AudioPacket *audio)
-{
-    AudioQueue *item = NULL;
-
-    if (!audio)
-        return;
-
-    item = (AudioQueue *) malloc(sizeof (AudioQueue));
-    if (!item)
-    {
-        THEORAPLAY_freeAudio(audio);
-        return;  // oh well.
-    } // if
-
-    item->audio = audio;
-    item->offset = 0;
-    item->next = NULL;
-
-    SDL_LockAudio();
-    if (audio_queue_tail)
-        audio_queue_tail->next = item;
-    else
-        audio_queue = item;
-    audio_queue_tail = item;
-    SDL_UnlockAudio();
-} // queue_audio
-
-
-static Uint32 sdlyuvfmt(const THEORAPLAY_VideoFormat vidfmt)
-{
-    switch (vidfmt)
-    {
-        case THEORAPLAY_VIDFMT_YV12:
-            return SDL_YV12_OVERLAY;
-        case THEORAPLAY_VIDFMT_IYUV:
-            return SDL_IYUV_OVERLAY;
-        default: break;
-    } // switch
-
-    return 0;
-} // need_overlay
-
-
-static void setcaption(const char *fname,
-                       const THEORAPLAY_VideoFormat vidfmt,
-                       const THEORAPLAY_VideoFrame *video,
-                       const THEORAPLAY_AudioPacket *audio)
-{
-    char buf[1024];
-    const char *fmtstr = "???";
-    const char *basefname = NULL;
-    const char *renderer = "OpenGL";
-
-    basefname = strrchr(fname, '/');
-    if (!basefname)
-        basefname = fname;
-    else
-        basefname++;
-
-    switch (vidfmt)
-    {
-        case THEORAPLAY_VIDFMT_RGB:  fmtstr = "RGB";  break;
-        case THEORAPLAY_VIDFMT_RGBA: fmtstr = "RGBA"; break;
-        case THEORAPLAY_VIDFMT_YV12: fmtstr = "YV12"; break;
-        case THEORAPLAY_VIDFMT_IYUV: fmtstr = "IYUV"; break;
-        default: assert(0 && "Unexpected video format!"); break;
-    } // switch
-
-    if (!audio && !video)
-        snprintf(buf, sizeof (buf), "%s (no video, no audio)", basefname);
-    else if (audio && video)
-    {
-        snprintf(buf, sizeof (buf), "%s (%ux%u, %.2gfps, %s %s, %uch, %uHz)",
-                 basefname, video->width, video->height, video->fps,
-                 renderer, fmtstr, audio->channels, audio->freq);
-    } // else if
-    else if (!audio && video)
-    {
-        snprintf(buf, sizeof (buf), "%s (%ux%u, %ffps, %s %s, no audio)",
-                 basefname, video->width, video->height, video->fps,
-                 renderer, fmtstr);
-    } // else if
-    else if (audio && !video)
-    {
-        snprintf(buf, sizeof (buf), "%s (no video, %uch, %uHz)",
-                 basefname, audio->channels, audio->freq);
-    } // else if
-
-    printf("%s\n", buf);
-
-    if (video)
-        SDL_WM_SetCaption(buf, basefname);
-} // setcaption
-
-
-static const char *glsl_vertex =
-    "#version 110\n"
-    "attribute vec2 pos;\n"
-    "attribute vec2 tex;\n"
-    "void main() {\n"
-        "gl_Position = vec4(pos.xy, 0.0, 1.0);\n"
-        "gl_TexCoord[0].xy = tex;\n"
-    "}\n";
-
-static const char *glsl_rgba_fragment =
-    "#version 110\n"
-    "uniform sampler2D samp;\n"
-    "void main() { gl_FragColor = texture2D(samp, gl_TexCoord[0].xy); }\n";
-
-// This shader was originally from SDL 1.3.
-static const char *glsl_yuv_fragment =
-    "#version 110\n"
-    "uniform sampler2D samp0;\n"
-    "uniform sampler2D samp1;\n"
-    "uniform sampler2D samp2;\n"
-    "const vec3 offset = vec3(-0.0625, -0.5, -0.5);\n"
-    "const vec3 Rcoeff = vec3(1.164,  0.000,  1.596);\n"
-    "const vec3 Gcoeff = vec3(1.164, -0.391, -0.813);\n"
-    "const vec3 Bcoeff = vec3(1.164,  2.018,  0.000);\n"
-    "void main() {\n"
-    "    vec2 tcoord;\n"
-    "    vec3 yuv, rgb;\n"
-    "    tcoord = gl_TexCoord[0].xy;\n"
-    "    yuv.x = texture2D(samp0, tcoord).r;\n"
-    "    yuv.y = texture2D(samp1, tcoord).r;\n"
-    "    yuv.z = texture2D(samp2, tcoord).r;\n"
-    "    yuv += offset;\n"
-    "    rgb.r = dot(yuv, Rcoeff);\n"
-    "    rgb.g = dot(yuv, Gcoeff);\n"
-    "    rgb.b = dot(yuv, Bcoeff);\n"
-    "    gl_FragColor = vec4(rgb, 1.0);\n"
-    "}\n";
-
-static int init_shaders(const THEORAPLAY_VideoFormat vidfmt)
-{
-    const char *vertexsrc = glsl_vertex;
-    const char *fragmentsrc = NULL;
-    GLuint vertex = 0;
-    GLuint fragment = 0;
-    GLuint program = 0;
-    GLint ok = 0;
-    GLint shaderlen = 0;
-
-    switch (vidfmt)
-    {
-        case THEORAPLAY_VIDFMT_RGB:
-        case THEORAPLAY_VIDFMT_RGBA:
-            fragmentsrc = glsl_rgba_fragment;
-            break;
-        case THEORAPLAY_VIDFMT_YV12:
-        case THEORAPLAY_VIDFMT_IYUV:
-            fragmentsrc = glsl_yuv_fragment;
-            break;
-        default: return 0;
-    } // switch
-
-    ok = 0;
-    shaderlen = (GLint) strlen(vertexsrc);
-    vertex = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex, 1, (const GLchar **) &vertexsrc, &shaderlen);
-    glCompileShader(vertex);
-    glGetShaderiv(vertex, GL_COMPILE_STATUS, &ok);
-    if (!ok)
-    {
-        glDeleteShader(vertex);
-        return 0;
-    } // if
-
-    ok = 0;
-    shaderlen = (GLint) strlen(fragmentsrc);
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment, 1, (const GLchar **) &fragmentsrc, &shaderlen);
-    glCompileShader(fragment);
-    glGetShaderiv(fragment, GL_COMPILE_STATUS, &ok);
-    if (!ok)
-    {
-        glDeleteShader(fragment);
-        return 0;
-    } // if
-
-    ok = 0;
-    program = glCreateProgram();
-    glAttachShader(program, vertex);
-    glAttachShader(program, fragment);
-    glBindAttribLocation(program, 0, "pos");
-    glBindAttribLocation(program, 1, "tex");
-    glLinkProgram(program);
-    glDeleteShader(vertex);
-    glDeleteShader(fragment);
-    glGetProgramiv(program, GL_LINK_STATUS, &ok);
-    if (!ok)
-    {
-        glDeleteProgram(program);
-        return 0;
-    } // if
-
-    glUseProgram(program);
-
-    if (fragmentsrc == glsl_rgba_fragment)
-        glUniform1i(glGetUniformLocation(program, "samp"), 0);
-    else if (fragmentsrc == glsl_yuv_fragment)
-    {
-        glUniform1i(glGetUniformLocation(program, "samp0"), 0);
-        glUniform1i(glGetUniformLocation(program, "samp1"), 1);
-        glUniform1i(glGetUniformLocation(program, "samp2"), 2);
-    } // else if
-
-    return 1;
-} // init_shaders
-
-static void prep_texture(GLuint *texture, const int idx)
-{
-    glActiveTexture(GL_TEXTURE0 + idx);
-    glBindTexture(GL_TEXTURE_2D, texture[idx]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-} // prep_texture
-
-
-static void init_textures(const THEORAPLAY_VideoFrame *video,
-                          const GLenum glfmt, const GLenum gltype,
-                          GLuint *texture)
-{
-    const int planar = (sdlyuvfmt(video->format) != 0);
-
-    glGenTextures(planar ? 3 : 1, texture);
-    prep_texture(texture, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, glfmt, video->width, video->height, 0,
-                 glfmt, gltype, NULL);
-
-    if (planar)
-    {
-        prep_texture(texture, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, glfmt, video->width / 2,
-                     video->height / 2, 0, glfmt, gltype, NULL);
-        prep_texture(texture, 2);
-        glTexImage2D(GL_TEXTURE_2D, 0, glfmt, video->width / 2,
-                     video->height / 2, 0, glfmt, gltype, NULL);
-    } // if
-} // init_textures
-
-static void openglfmt(const THEORAPLAY_VideoFrame *video,
-                      GLenum *glfmt, GLenum *gltype)
-{
-    switch (video->format)
-    {
-        case THEORAPLAY_VIDFMT_RGB:
-            *glfmt = GL_RGB;
-            *gltype = GL_UNSIGNED_BYTE;
-            break;
-        case THEORAPLAY_VIDFMT_RGBA:
-            *glfmt = GL_RGBA;
-            *gltype = GL_UNSIGNED_INT_8_8_8_8_REV;
-            break;
-        case THEORAPLAY_VIDFMT_YV12:
-        case THEORAPLAY_VIDFMT_IYUV:
-            *glfmt = GL_LUMINANCE;
-            *gltype = GL_UNSIGNED_BYTE;
-            break;
-    } // switch
-} // openglfmt
-
-
-static void queue_more_audio(THEORAPLAY_Decoder *decoder, const Uint32 now)
-{
-    const THEORAPLAY_AudioPacket *audio;
-    while ((audio = THEORAPLAY_getAudio(decoder)) != NULL)
-    {
-        const unsigned int playms = audio->playms;
-        //printf("Got %d frames of audio (%u ms)!\n", audio->frames, audio->playms);
-        queue_audio(audio);
-        if (playms >= now + 2000)  // don't let this get too far ahead.
-            break;
-    } // while
-} // queue_more_audio
-
-
-static void playfile(const char *fname, const THEORAPLAY_VideoFormat vidfmt,
-                     const int fullscreen)
-{
-    const int MAX_FRAMES = 30;
-    THEORAPLAY_Decoder *decoder = NULL;
-    const THEORAPLAY_VideoFrame *video = NULL;
-    const THEORAPLAY_AudioPacket *audio = NULL;
-    Uint32 vidmodeflags = 0;
-    SDL_Surface *screen = NULL;
-    SDL_Surface *shadow = NULL;
-    SDL_Overlay *overlay = NULL;
-    int has_audio = 0;
-    int has_video = 0;
-    Uint32 sdlinitflags = 0;
-    GLenum glfmt = GL_NONE;
-    GLenum gltype = GL_NONE;
-    GLuint texture[3] = { 0, 0, 0 };
-    SDL_Event event;
-    Uint32 framems = 0;
-    int opened_audio = 0;
-    int initfailed = 0;
-    int planar = 0;
-    int quit = 0;
-
-    printf("Trying file '%s' ...\n", fname);
-
-    decoder = THEORAPLAY_startDecodeFile(fname, MAX_FRAMES, vidfmt);
-    if (!decoder)
-    {
-        fprintf(stderr, "Failed to start decoding '%s'!\n", fname);
-        return;
-    } // if
-
-    // Wait until the decoder has parsed out some basic truths from the
-    //  file. In a video game, you could choose not to block on this, and
-    //  instead do something else until the file is ready.
-    while (!THEORAPLAY_isInitialized(decoder))
-        SDL_Delay(10);
-
-    // Once we're initialized, we can tell if this file has audio and/or video.
-    has_audio = THEORAPLAY_hasAudioStream(decoder);
-    has_video = THEORAPLAY_hasVideoStream(decoder);
-
-    if (has_video)
-        sdlinitflags |= SDL_INIT_VIDEO;
-    if (has_audio)
-        sdlinitflags |= SDL_INIT_AUDIO;
-
-    if (SDL_Init(sdlinitflags) == -1)
-    {
-        fprintf(stderr, "SDL_Init() failed: %s\n", SDL_GetError());
-        return;
-    } // if
-
-    // wait until we have video and/or audio data, so we can set up hardware.
-    if (has_video)
-    {
-        while ((video = THEORAPLAY_getVideo(decoder)) == NULL)
-            SDL_Delay(10);
-    } // if
-
-    if (has_audio)
-    {
-        while ((audio = THEORAPLAY_getAudio(decoder)) == NULL)
-        {
-            if ((has_video) && (THEORAPLAY_availableVideo(decoder) >= MAX_FRAMES))
-                break;  // we'll never progress, there's no audio yet but we've prebuffered as much as we plan to.
-            SDL_Delay(10);
-        } // while
-    } // if
-
-    setcaption(fname, vidfmt, video, audio);
-
-    if (has_video)
-    {
-        const Uint32 overlayfmt = sdlyuvfmt(vidfmt);
-        planar = (overlayfmt != 0);
-        framems = (video->fps == 0.0) ? 0 : ((Uint32) (1000.0 / video->fps));
-
-        vidmodeflags = 0;
-
-        if (fullscreen)
-        {
-            vidmodeflags |= SDL_FULLSCREEN;
-            SDL_ShowCursor(0);
-        } // if
-
-        vidmodeflags |= (SDL_OPENGL | SDL_RESIZABLE);
-        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
-        screen = SDL_SetVideoMode(video->width, video->height, 0, vidmodeflags);
-
-        initfailed = quit = (initfailed || !screen);
-
-        if (!screen)
-            fprintf(stderr, "SDL_SetVideoMode() failed: %s\n", SDL_GetError());
-        else
-        {
-            static struct { float pos[2]; float tex[2]; } verts[4] = {
-                { { -1.0f,  1.0f }, { 0.0f, 0.0f } },
-                { {  1.0f,  1.0f }, { 1.0f, 0.0f } },
-                { { -1.0f, -1.0f }, { 0.0f, 1.0f } },
-                { {  1.0f, -1.0f }, { 1.0f, 1.0f } }
-            };
-
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            SDL_GL_SwapBuffers();
-            glClear(GL_COLOR_BUFFER_BIT);
-            SDL_GL_SwapBuffers();
-            glClear(GL_COLOR_BUFFER_BIT);
-            SDL_GL_SwapBuffers();
-
-            openglfmt(video, &glfmt, &gltype);
-
-            initfailed = quit = (initfailed || !init_shaders(vidfmt));
-            if (!initfailed)
-            {
-                glVertexAttribPointer(0, 2, GL_FLOAT, 0, sizeof (verts[0]), &verts[0].pos[0]);
-                glVertexAttribPointer(1, 2, GL_FLOAT, 0, sizeof (verts[0]), &verts[0].tex[0]);
-                glEnableVertexAttribArray(0);
-                glEnableVertexAttribArray(1);
-
-                glDepthMask(GL_FALSE);
-                glDisable(GL_DEPTH_TEST);
-                glDisable(GL_ALPHA_TEST);
-                glDisable(GL_BLEND);
-                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-                init_textures(video, glfmt, gltype, texture);
-            } // if
-        } // else if
-        #endif
-
-        else  // software surface
-        {
-            // blank out the screen to start.
-            SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
-            SDL_Flip(screen);
-
-            if (planar)
-            {
-                overlay = SDL_CreateYUVOverlay(video->width, video->height,
-                                               overlayfmt, screen);
-
-                if (!overlay)
-                    fprintf(stderr, "YUV Overlay failed: %s\n", SDL_GetError());
-                initfailed = quit = (initfailed || !overlay);
-            } // if
-            else
-            {
-                const int alpha = (vidfmt == THEORAPLAY_VIDFMT_RGBA);
-                const int bits = 24 + (alpha * 8);
-                const Uint32 rmask = SDL_SwapLE32(0xFF0000FF);
-                const Uint32 gmask = SDL_SwapLE32(0x0000FF00);
-                const Uint32 bmask = SDL_SwapLE32(0x00FF0000);
-                const Uint32 amask = 0x00000000;
-                shadow = SDL_CreateRGBSurface(SDL_SWSURFACE,
-                                              video->width, video->height,
-                                              bits, rmask, gmask, bmask, amask);
-                if (!shadow)
-                    fprintf(stderr, "Shadow surface failed: %s\n", SDL_GetError());
-
-                assert(!shadow || !SDL_MUSTLOCK(shadow));
-                assert(!shadow || (shadow->pitch == (video->width * (bits/8))));
-                initfailed = quit = (initfailed || !shadow);
-            } // else
-        } // else
-    } // if
-
-    baseticks = SDL_GetTicks();
-
-    while (!quit && THEORAPLAY_isDecoding(decoder))
-    {
-        const Uint32 now = SDL_GetTicks() - baseticks;
-
-        // Open the audio device as soon as we know what it should be.
-        if ((has_audio) && (!opened_audio))
-        {
-            if (!audio)
-                audio = THEORAPLAY_getAudio(decoder);
-            if (audio)
-            {
-                SDL_AudioSpec spec;
-                memset(&spec, '\0', sizeof (SDL_AudioSpec));
-                spec.freq = audio->freq;
-                spec.format = AUDIO_S16SYS;
-                spec.channels = audio->channels;
-                spec.samples = 2048;
-                spec.callback = audio_callback;
-                initfailed = quit = (initfailed || (SDL_OpenAudio(&spec, NULL) != 0));
-                if (!quit)
-                {
-                    // queue some audio to start.
-                    opened_audio = 1;
-                    queue_audio(audio);
-                    audio = NULL;
-                    queue_more_audio(decoder, 0);
-                    SDL_PauseAudio(0);  // start audio playback!
-                } // if
-            } // if
-        } // if
-
-        if (!video)
-            video = THEORAPLAY_getVideo(decoder);
-
-        // Play video frames when it's time.
-        if (video && (video->playms <= now))
-        {
-            //printf("Play video frame (%u ms)!\n", video->playms);
-            if ( framems && ((now - video->playms) >= framems) )
-            {
-                // Skip frames to catch up, but keep track of the last one
-                //  in case we catch up to a series of dupe frames, which
-                //  means we'd have to draw that final frame and then wait for
-                //  more.
-                const THEORAPLAY_VideoFrame *last = video;
-                while ((video = THEORAPLAY_getVideo(decoder)) != NULL)
-                {
-                    THEORAPLAY_freeVideo(last);
-                    last = video;
-                    if ((now - video->playms) < framems)
-                        break;
-                } // while
-
-                if (!video)
-                    video = last;
-            } // if
-
-            if (!video)  // do nothing; we're far behind and out of options.
-            {
-                static int warned = 0;
-                if (!warned)
-                {
-                    warned = 1;
-                    fprintf(stderr, "WARNING: Playback can't keep up!\n");
-                } // if
-            } // if
-
-            else
-            {
-                GLint w = video->width;
-                GLint h = video->height;
-                const Uint8 *pix = (const Uint8 *) video->pixels;
-
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, texture[0]);
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, glfmt, gltype, pix);
-                if (planar)
-                {
-                    const int swapped = (vidfmt == THEORAPLAY_VIDFMT_YV12);
-                    pix += w * h;
-                    glActiveTexture(swapped ? GL_TEXTURE2 : GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, texture[1]);
-                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w / 2, h / 2, glfmt, gltype, pix);
-                    pix += (w / 2) * (h / 2);
-                    glActiveTexture(swapped ? GL_TEXTURE1 : GL_TEXTURE2);
-                    glBindTexture(GL_TEXTURE_2D, texture[2]);
-                    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w / 2, h / 2, glfmt, gltype, pix);
-                } // if
-
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                SDL_GL_SwapBuffers();
-            } // else if
-
-            THEORAPLAY_freeVideo(video);
-            video = NULL;
-        } // if
-        else  // no new video frame? Give up some CPU.
-        {
-            SDL_Delay(10);
-        } // else
-
-        if (opened_audio)
-            queue_more_audio(decoder, now);
-
-        // Pump the event loop here.
-        while (screen && SDL_PollEvent(&event))
-        {
-            switch (event.type)
-            {
-                case SDL_VIDEOEXPOSE:
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                    SDL_GL_SwapBuffers();
-                    break;
-
-                case SDL_VIDEORESIZE:
-                    screen = SDL_SetVideoMode(event.resize.w, event.resize.h, 0, vidmodeflags);
-                    glViewport(0, 0, event.resize.w, event.resize.h);
-                    glScissor(0, 0, event.resize.w, event.resize.h);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                    SDL_GL_SwapBuffers();
-                    break;
-
-                case SDL_QUIT:
-                    quit = 1;
-                    break;
-
-                case SDL_KEYDOWN:
-                    if (event.key.keysym.sym == SDLK_ESCAPE)
-                        quit = 1;
-                    break;
-            } // switch
-        } // while
-    } // while
-
-    if (opened_audio)
-    {
-        while (!quit)
-        {
-            SDL_LockAudio();
-            quit = (audio_queue == NULL);
-            SDL_UnlockAudio();
-            if (!quit)
-                SDL_Delay(100);  // wait for final audio packets to play out.
-        } // while
-    } // if
-
-    if (initfailed)
-        printf("Initialization failed!\n");
-    else if (THEORAPLAY_decodingError(decoder))
-        printf("There was an error decoding this file!\n");
-    else
-        printf("done with this file!\n");
-
-    if (shadow) SDL_FreeSurface(shadow);
-    if (video) THEORAPLAY_freeVideo(video);
-    if (audio) THEORAPLAY_freeAudio(audio);
-    if (decoder) THEORAPLAY_stopDecode(decoder);
-    if (opened_audio) SDL_CloseAudio();
-    SDL_Quit();
-} // playfile
-
-int main(int argc, char **argv)
-{
-    THEORAPLAY_VideoFormat vidfmt = THEORAPLAY_VIDFMT_YV12;
-    int fullscreen = 0;
     int i;
-
-    for (i = 1; i < argc; i++)
+    const int w = tinfo->pic_width;
+    const int h = tinfo->pic_height;
+    const int yoff = (tinfo->pic_x & ~1) + ycbcr[0].stride * (tinfo->pic_y & ~1);
+    const int uvoff = (tinfo->pic_x / 2) + (ycbcr[1].stride) * (tinfo->pic_y / 2);
+    unsigned char *yuv = (unsigned char *) malloc(w * h * 2);
+    if (yuv)
     {
-        if (strcmp(argv[i], "--rgb") == 0)
-            vidfmt = THEORAPLAY_VIDFMT_RGB;
-        else if (strcmp(argv[i], "--rgba") == 0)
-            vidfmt = THEORAPLAY_VIDFMT_RGBA;
-        else if (strcmp(argv[i], "--yv12") == 0)
-            vidfmt = THEORAPLAY_VIDFMT_YV12;
-        else if (strcmp(argv[i], "--iyuv") == 0)
-            vidfmt = THEORAPLAY_VIDFMT_IYUV;
-        else if (strcmp(argv[i], "--fullscreen") == 0)
-            fullscreen = 1;
-        else if (strcmp(argv[i], "--windowed") == 0)
-            fullscreen = 0;
-        else
-            playfile(argv[i], vidfmt, fullscreen);
-    } // for
+        unsigned char *dst = yuv;
+        for (i = 0; i < h; i++, dst += w)
+            memcpy(dst, ycbcr[p0].data + yoff + ycbcr[p0].stride * i, w);
+        for (i = 0; i < (h / 2); i++, dst += w/2)
+            memcpy(dst, ycbcr[p1].data + uvoff + ycbcr[p1].stride * i, w / 2);
+        for (i = 0; i < (h / 2); i++, dst += w/2)
+            memcpy(dst, ycbcr[p2].data + uvoff + ycbcr[p2].stride * i, w / 2);
+    } // if
 
-    printf("done all files!\n");
+    return yuv;
+} // ConvertVideoFrame420ToYUVPlanar
 
-    return 0;
-} // main
 
-// end of sdltheoraplay.c ...
+static unsigned char *ConvertVideoFrame420ToYV12(const th_info *tinfo,
+                                                 const th_ycbcr_buffer ycbcr)
+{
+    return ConvertVideoFrame420ToYUVPlanar(tinfo, ycbcr, 0, 2, 1);
+} // ConvertVideoFrame420ToYV12
+
+
+static unsigned char *ConvertVideoFrame420ToIYUV(const th_info *tinfo,
+                                                 const th_ycbcr_buffer ycbcr)
+{
+    return ConvertVideoFrame420ToYUVPlanar(tinfo, ycbcr, 0, 1, 2);
+} // ConvertVideoFrame420ToIYUV
+
+
+// RGB
+#define THEORAPLAY_CVT_FNNAME_420 ConvertVideoFrame420ToRGB
+#define THEORAPLAY_CVT_RGB_ALPHA 0
+#include "theoraplay_cvtrgb.h"
+#undef THEORAPLAY_CVT_RGB_ALPHA
+#undef THEORAPLAY_CVT_FNNAME_420
+
+// RGBA
+#define THEORAPLAY_CVT_FNNAME_420 ConvertVideoFrame420ToRGBA
+#define THEORAPLAY_CVT_RGB_ALPHA 1
+#include "theoraplay_cvtrgb.h"
+#undef THEORAPLAY_CVT_RGB_ALPHA
+#undef THEORAPLAY_CVT_FNNAME_420
+
+
+typedef struct TheoraDecoder
+{
+    // API state...
+    THEORAPLAY_Io *io;
+    volatile unsigned int prepped;
+    // volatile unsigned int audioms;  // currently buffered audio samples.
+    volatile int hasvideo;
+    volatile int hasaudio;
+    volatile int decode_error;
+
+    THEORAPLAY_VideoFormat vidfmt;
+    ConvertVideoFrameFn vidcvt;
+
+    VideoFrame videof;
+
+    // Audio Queue Here
+} TheoraDecoder;
+
+static int FeedMoreOggData(THEORAPLAY_Io *io, ogg_sync_state *sync)
+{
+    long buflen = 4096;
+    char *buffer = ogg_sync_buffer(sync, buflen);
+    if (buffer == NULL)
+        return -1;
+
+    buflen = io->read(io, buffer, buflen);
+    if (buflen <= 0)
+        return 0;
+
+    return (ogg_sync_wrote(sync, buflen) == 0) ? 1 : -1;
+} // FeedMoreOggData
+
+// This massive function is where all the effort happens.
+static void InitDecoder(TheoraDecoder *ctx)
+{
+    // make sure we initialized the stream before using pagein, but the stream
+    //  will know to ignore pages that aren't meant for it, so pass to both.
+    #define queue_ogg_page(ctx) do { \
+        if (tpackets) ogg_stream_pagein(&tstream, &page); \
+        if (vpackets) ogg_stream_pagein(&vstream, &page); \
+    } while (0)
+
+    unsigned long audioframes = 0;
+    unsigned long videoframes = 0;
+    double fps = 0.0;
+    int was_error = 1;  // resets to 0 at the end.
+    int eos = 0;  // end of stream flag.
+
+    // Too much Ogg/Vorbis/Theora state...
+    ogg_packet packet;
+    ogg_sync_state sync;
+    ogg_page page;
+    int vpackets = 0;
+    vorbis_info vinfo;
+    vorbis_comment vcomment;
+    ogg_stream_state vstream;
+    int vdsp_init = 0;
+    vorbis_dsp_state vdsp;
+    int tpackets = 0;
+    th_info tinfo;
+    th_comment tcomment;
+    ogg_stream_state tstream;
+    int vblock_init = 0;
+    vorbis_block vblock;
+    th_dec_ctx *tdec = NULL;
+    th_setup_info *tsetup = NULL;
+
+    ogg_sync_init(&sync);
+    vorbis_info_init(&vinfo);
+    vorbis_comment_init(&vcomment);
+    th_comment_init(&tcomment);
+    th_info_init(&tinfo);
+
+    int bos = 1;
+    while (!ctx->halt && bos)
+    {
+        if (FeedMoreOggData(ctx->io, &sync) <= 0)
+            goto cleanup;
+
+        // parse out the initial header.
+        while ( (!ctx->halt) && (ogg_sync_pageout(&sync, &page) > 0) )
+        {
+            ogg_stream_state test;
+
+            if (!ogg_page_bos(&page))  // not a header.
+            {
+                queue_ogg_page(ctx);
+                bos = 0;
+                break;
+            } // if
+
+            ogg_stream_init(&test, ogg_page_serialno(&page));
+            ogg_stream_pagein(&test, &page);
+            ogg_stream_packetout(&test, &packet);
+
+            if (!tpackets && (th_decode_headerin(&tinfo, &tcomment, &tsetup, &packet) >= 0))
+            {
+                memcpy(&tstream, &test, sizeof (test));
+                tpackets = 1;
+            } // if
+            else if (!vpackets && (vorbis_synthesis_headerin(&vinfo, &vcomment, &packet) >= 0))
+            {
+                memcpy(&vstream, &test, sizeof (test));
+                vpackets = 1;
+            } // else if
+            else
+            {
+                // whatever it is, we don't care about it
+                ogg_stream_clear(&test);
+            } // else
+        } // while
+    } // while
+
+    // no audio OR video?
+    if (ctx->halt || (!vpackets && !tpackets))
+        goto cleanup;
+
+    // apparently there are two more theora and two more vorbis headers next.
+    while ((!ctx->halt) && ((tpackets && (tpackets < 3)) || (vpackets && (vpackets < 3))))
+    {
+        while (!ctx->halt && tpackets && (tpackets < 3))
+        {
+            if (ogg_stream_packetout(&tstream, &packet) != 1)
+                break; // get more data?
+            if (!th_decode_headerin(&tinfo, &tcomment, &tsetup, &packet))
+                goto cleanup;
+            tpackets++;
+        } // while
+
+        while (!ctx->halt && vpackets && (vpackets < 3))
+        {
+            if (ogg_stream_packetout(&vstream, &packet) != 1)
+                break;  // get more data?
+            if (vorbis_synthesis_headerin(&vinfo, &vcomment, &packet))
+                goto cleanup;
+            vpackets++;
+        } // while
+
+        // get another page, try again?
+        if (ogg_sync_pageout(&sync, &page) > 0)
+            queue_ogg_page(ctx);
+        else if (FeedMoreOggData(ctx->io, &sync) <= 0)
+            goto cleanup;
+    } // while
+
+    // okay, now we have our streams, ready to set up decoding.
+    if (!ctx->halt && tpackets)
+    {
+        // th_decode_alloc() docs say to check for insanely large frames yourself.
+        if ((tinfo.frame_width > 99999) || (tinfo.frame_height > 99999))
+            goto cleanup;
+
+        // We treat "unspecified" as NTSC. *shrug*
+        if ( (tinfo.colorspace != TH_CS_UNSPECIFIED) &&
+             (tinfo.colorspace != TH_CS_ITU_REC_470M) &&
+             (tinfo.colorspace != TH_CS_ITU_REC_470BG) )
+        {
+            assert(0 && "Unsupported colorspace.");  // !!! FIXME
+            goto cleanup;
+        } // if
+
+        if (tinfo.pixel_fmt != TH_PF_420) { assert(0); goto cleanup; } // !!! FIXME
+
+        if (tinfo.fps_denominator != 0)
+            fps = ((double) tinfo.fps_numerator) / ((double) tinfo.fps_denominator);
+
+        tdec = th_decode_alloc(&tinfo, tsetup);
+        if (!tdec) goto cleanup;
+
+        // Set decoder to maximum post-processing level.
+        //  Theoretically we could try dropping this level if we're not keeping up.
+        int pp_level_max = 0;
+        // !!! FIXME: maybe an API to set this?
+        //th_decode_ctl(tdec, TH_DECCTL_GET_PPLEVEL_MAX, &pp_level_max, sizeof(pp_level_max));
+        th_decode_ctl(tdec, TH_DECCTL_SET_PPLEVEL, &pp_level_max, sizeof(pp_level_max));
+    } // if
+
+    // Done with this now.
+    if (tsetup != NULL)
+    {
+        th_setup_free(tsetup);
+        tsetup = NULL;
+    } // if
+
+    if (!ctx->halt && vpackets)
+    {
+        vdsp_init = (vorbis_synthesis_init(&vdsp, &vinfo) == 0);
+        if (!vdsp_init)
+            goto cleanup;
+        vblock_init = (vorbis_block_init(&vdsp, &vblock) == 0);
+        if (!vblock_init)
+            goto cleanup;
+    } // if
+
+    // Now we can start the actual decoding!
+    // Note that audio and video don't _HAVE_ to start simultaneously.
+
+    Mutex_Lock(ctx->lock);
+    ctx->prepped = 1;
+    ctx->hasvideo = (tpackets != 0);
+    ctx->hasaudio = (vpackets != 0);
+    Mutex_Unlock(ctx->lock);
+}
+
+
+static void Decode(TheoraDecoder *ctx)
+    while (!ctx->halt && !eos)
+    {
+        int need_pages = 0;  // need more Ogg pages?
+        int saw_video_frame = 0;
+
+        // Try to read as much audio as we can at once. We limit the outer
+        //  loop to one video frame and as much audio as we can eat.
+        while (!ctx->halt && vpackets)
+        {
+            float **pcm = NULL;
+            const int frames = vorbis_synthesis_pcmout(&vdsp, &pcm);
+            if (frames > 0)
+            {
+                const int channels = vinfo.channels;
+                int chanidx, frameidx;
+                float *samples;
+                AudioPacket *item = (AudioPacket *) malloc(sizeof (AudioPacket));
+                if (item == NULL) goto cleanup;
+                item->playms = (unsigned long) ((((double) audioframes) / ((double) vinfo.rate)) * 1000.0);
+                item->channels = channels;
+                item->freq = vinfo.rate;
+                item->frames = frames;
+                item->samples = (float *) malloc(sizeof (float) * frames * channels);
+                item->next = NULL;
+
+                if (item->samples == NULL)
+                {
+                    free(item);
+                    goto cleanup;
+                } // if
+
+                // I bet this beats the crap out of the CPU cache...
+                samples = item->samples;
+                for (frameidx = 0; frameidx < frames; frameidx++)
+                {
+                    for (chanidx = 0; chanidx < channels; chanidx++)
+                        *(samples++) = pcm[chanidx][frameidx];
+                } // for
+
+                vorbis_synthesis_read(&vdsp, frames);  // we ate everything.
+                audioframes += frames;
+
+                //printf("Decoded %d frames of audio.\n", (int) frames);
+                Mutex_Lock(ctx->lock);
+                ctx->audioms += item->playms;
+                if (ctx->audiolisttail)
+                {
+                    assert(ctx->audiolist);
+                    ctx->audiolisttail->next = item;
+                } // if
+                else
+                {
+                    assert(!ctx->audiolist);
+                    ctx->audiolist = item;
+                } // else
+                ctx->audiolisttail = item;
+                Mutex_Unlock(ctx->lock);
+            } // if
+
+            else  // no audio available left in current packet?
+            {
+                // try to feed another packet to the Vorbis stream...
+                if (ogg_stream_packetout(&vstream, &packet) <= 0)
+                {
+                    if (!tpackets)
+                        need_pages = 1; // no video, get more pages now.
+                    break;  // we'll get more pages when the video catches up.
+                } // if
+                else
+                {
+                    if (vorbis_synthesis(&vblock, &packet) == 0)
+                        vorbis_synthesis_blockin(&vdsp, &vblock);
+                } // else
+            } // else
+        } // while
+
+        if (!ctx->halt && tpackets)
+        {
+            // Theora, according to example_player.c, is
+            //  "one [packet] in, one [frame] out."
+            if (ogg_stream_packetout(&tstream, &packet) <= 0)
+                need_pages = 1;
+            else
+            {
+                ogg_int64_t granulepos = 0;
+                const int rc = th_decode_packetin(tdec, &packet, &granulepos);
+                if (rc == TH_DUPFRAME)
+                    videoframes++;  // nothing else to do.
+                else if (rc == 0)  // new frame!
+                {
+                    th_ycbcr_buffer ycbcr;
+                    if (th_decode_ycbcr_out(tdec, ycbcr) == 0)
+                    {
+                        VideoFrame *item = (VideoFrame *) malloc(sizeof (VideoFrame));
+                        if (item == NULL) goto cleanup;
+                        item->playms = (fps == 0) ? 0 : (unsigned int) ((((double) videoframes) / fps) * 1000.0);
+                        item->fps = fps;
+                        item->width = tinfo.pic_width;
+                        item->height = tinfo.pic_height;
+                        item->format = ctx->vidfmt;
+                        item->pixels = ctx->vidcvt(&tinfo, ycbcr);
+                        item->next = NULL;
+
+                        if (item->pixels == NULL)
+                        {
+                            free(item);
+                            goto cleanup;
+                        } // if
+
+                        //printf("Decoded another video frame.\n");
+                        Mutex_Lock(ctx->lock);
+                        if (ctx->videolisttail)
+                        {
+                            assert(ctx->videolist);
+                            ctx->videolisttail->next = item;
+                        } // if
+                        else
+                        {
+                            assert(!ctx->videolist);
+                            ctx->videolist = item;
+                        } // else
+                        ctx->videolisttail = item;
+                        ctx->videocount++;
+                        Mutex_Unlock(ctx->lock);
+
+                        saw_video_frame = 1;
+                    } // if
+                    videoframes++;
+                } // if
+            } // else
+        } // if
+
+        if (!ctx->halt && need_pages)
+        {
+            const int rc = FeedMoreOggData(ctx->io, &sync);
+            if (rc == 0)
+                eos = 1;  // end of stream
+            else if (rc < 0)
+                goto cleanup;  // i/o error, etc.
+            else
+            {
+                while (!ctx->halt && (ogg_sync_pageout(&sync, &page) > 0))
+                    queue_ogg_page(ctx);
+            } // else
+        } // if
+
+        // Sleep the process until we have space for more frames.
+        if (saw_video_frame)
+        {
+            int go_on = !ctx->halt;
+            //printf("Sleeping.\n");
+            while (go_on)
+            {
+                // !!! FIXME: This is stupid. I should use a semaphore for this.
+                Mutex_Lock(ctx->lock);
+                go_on = !ctx->halt && (ctx->videocount >= ctx->maxframes);
+                Mutex_Unlock(ctx->lock);
+                if (go_on)
+                    sleepms(10);
+            } // while
+            //printf("Awake!\n");
+        } // if
+    } // while
+
+    was_error = 0;
+
+cleanup:
+    ctx->decode_error = (!ctx->halt && was_error);
+    if (tdec != NULL) th_decode_free(tdec);
+    if (tsetup != NULL) th_setup_free(tsetup);
+    if (vblock_init) vorbis_block_clear(&vblock);
+    if (vdsp_init) vorbis_dsp_clear(&vdsp);
+    if (tpackets) ogg_stream_clear(&tstream);
+    if (vpackets) ogg_stream_clear(&vstream);
+    th_info_clear(&tinfo);
+    th_comment_clear(&tcomment);
+    vorbis_comment_clear(&vcomment);
+    vorbis_info_clear(&vinfo);
+    ogg_sync_clear(&sync);
+    ctx->io->close(ctx->io);
+    ctx->thread_done = 1;
+} // WorkerThread
+
+
+static void *WorkerThreadEntry(void *_this)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) _this;
+    WorkerThread(ctx);
+    //printf("Worker thread is done.\n");
+    return NULL;
+} // WorkerThreadEntry
+
+
+static long IoFopenRead(THEORAPLAY_Io *io, void *buf, long buflen)
+{
+    FILE *f = (FILE *) io->userdata;
+    const size_t br = fread(buf, 1, buflen, f);
+    if ((br == 0) && ferror(f))
+        return -1;
+    return (long) br;
+} // IoFopenRead
+
+
+static void IoFopenClose(THEORAPLAY_Io *io)
+{
+    FILE *f = (FILE *) io->userdata;
+    fclose(f);
+    free(io);
+} // IoFopenClose
+
+
+THEORAPLAY_Decoder *THEORAPLAY_startDecodeFile(const char *fname,
+                                               const unsigned int maxframes,
+                                               THEORAPLAY_VideoFormat vidfmt)
+{
+    THEORAPLAY_Io *io = (THEORAPLAY_Io *) malloc(sizeof (THEORAPLAY_Io));
+    if (io == NULL)
+        return NULL;
+
+    FILE *f = fopen(fname, "rb");
+    if (f == NULL)
+    {
+        free(io);
+        return NULL;
+    } // if
+
+    io->read = IoFopenRead;
+    io->close = IoFopenClose;
+    io->userdata = f;
+    return THEORAPLAY_startDecode(io, maxframes, vidfmt);
+} // THEORAPLAY_startDecodeFile
+
+
+THEORAPLAY_Decoder *THEORAPLAY_startDecode(THEORAPLAY_Io *io,
+                                           const unsigned int maxframes,
+                                           THEORAPLAY_VideoFormat vidfmt)
+{
+    TheoraDecoder *ctx = NULL;
+    ConvertVideoFrameFn vidcvt = NULL;
+
+    switch (vidfmt)
+    {
+        // !!! FIXME: current expects TH_PF_420.
+        #define VIDCVT(t) case THEORAPLAY_VIDFMT_##t: vidcvt = ConvertVideoFrame420To##t; break;
+        VIDCVT(YV12)
+        VIDCVT(IYUV)
+        VIDCVT(RGB)
+        VIDCVT(RGBA)
+        #undef VIDCVT
+        default: goto startdecode_failed;  // invalid/unsupported format.
+    } // switch
+
+    ctx = (TheoraDecoder *) malloc(sizeof (TheoraDecoder));
+    if (ctx == NULL)
+        goto startdecode_failed;
+
+    memset(ctx, '\0', sizeof (TheoraDecoder));
+    ctx->maxframes = maxframes;
+    ctx->vidfmt = vidfmt;
+    ctx->vidcvt = vidcvt;
+    ctx->io = io;
+
+    if (Mutex_Create(ctx) == 0)
+    {
+        ctx->thread_created = (Thread_Create(ctx, WorkerThreadEntry) == 0);
+        if (ctx->thread_created)
+            return (THEORAPLAY_Decoder *) ctx;
+    } // if
+
+    Mutex_Destroy(ctx->lock);
+
+startdecode_failed:
+    io->close(io);
+    free(ctx);
+    return NULL;
+} // THEORAPLAY_startDecode
+
+
+void THEORAPLAY_stopDecode(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    if (!ctx)
+        return;
+
+    if (ctx->thread_created)
+    {
+        ctx->halt = 1;
+        Thread_Join(ctx->worker);
+        Mutex_Destroy(ctx->lock);
+    } // if
+
+    VideoFrame *videolist = ctx->videolist;
+    while (videolist)
+    {
+        VideoFrame *next = videolist->next;
+        free(videolist->pixels);
+        free(videolist);
+        videolist = next;
+    } // while
+
+    AudioPacket *audiolist = ctx->audiolist;
+    while (audiolist)
+    {
+        AudioPacket *next = audiolist->next;
+        free(audiolist->samples);
+        free(audiolist);
+        audiolist = next;
+    } // while
+
+    free(ctx);
+} // THEORAPLAY_stopDecode
+
+
+int THEORAPLAY_isDecoding(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    int retval = 0;
+    if (ctx)
+    {
+        Mutex_Lock(ctx->lock);
+        retval = ( ctx && (ctx->audiolist || ctx->videolist ||
+                   (ctx->thread_created && !ctx->thread_done)) );
+        Mutex_Unlock(ctx->lock);
+    } // if
+    return retval;
+} // THEORAPLAY_isDecoding
+
+
+#define GET_SYNCED_VALUE(typ, defval, decoder, member) \
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder; \
+    typ retval = defval; \
+    if (ctx) { \
+        Mutex_Lock(ctx->lock); \
+        retval = ctx->member; \
+        Mutex_Unlock(ctx->lock); \
+    } \
+    return retval;
+
+int THEORAPLAY_isInitialized(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(int, 0, decoder, prepped);
+} // THEORAPLAY_isInitialized
+
+
+int THEORAPLAY_hasVideoStream(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(int, 0, decoder, hasvideo);
+} // THEORAPLAY_hasVideoStream
+
+
+int THEORAPLAY_hasAudioStream(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(int, 0, decoder, hasaudio);
+} // THEORAPLAY_hasAudioStream
+
+
+unsigned int THEORAPLAY_availableVideo(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(unsigned int, 0, decoder, videocount);
+} // THEORAPLAY_hasAudioStream
+
+
+unsigned int THEORAPLAY_availableAudio(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(unsigned int, 0, decoder, audioms);
+} // THEORAPLAY_hasAudioStream
+
+
+int THEORAPLAY_decodingError(THEORAPLAY_Decoder *decoder)
+{
+    GET_SYNCED_VALUE(int, 0, decoder, decode_error);
+} // THEORAPLAY_decodingError
+
+
+const THEORAPLAY_AudioPacket *THEORAPLAY_getAudio(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    AudioPacket *retval;
+
+    Mutex_Lock(ctx->lock);
+    retval = ctx->audiolist;
+    if (retval)
+    {
+        ctx->audioms -= retval->playms;
+        ctx->audiolist = retval->next;
+        retval->next = NULL;
+        if (ctx->audiolist == NULL)
+            ctx->audiolisttail = NULL;
+    } // if
+    Mutex_Unlock(ctx->lock);
+
+    return retval;
+} // THEORAPLAY_getAudio
+
+
+void THEORAPLAY_freeAudio(const THEORAPLAY_AudioPacket *_item)
+{
+    THEORAPLAY_AudioPacket *item = (THEORAPLAY_AudioPacket *) _item;
+    if (item != NULL)
+    {
+        assert(item->next == NULL);
+        free(item->samples);
+        free(item);
+    } // if
+} // THEORAPLAY_freeAudio
+
+// ADDED BY MATTHEW
+const THEORAPLAY_VideoFrame *THEORAPLAY_peekVideo(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    VideoFrame *retval;
+
+    Mutex_Lock(ctx->lock);
+    retval = ctx->videolist;
+    Mutex_Unlock(ctx->lock);
+
+    return retval;
+} // THEORAPLAY_getVideo
+
+const THEORAPLAY_VideoFrame *THEORAPLAY_getVideo(THEORAPLAY_Decoder *decoder)
+{
+    TheoraDecoder *ctx = (TheoraDecoder *) decoder;
+    VideoFrame *retval;
+
+    Mutex_Lock(ctx->lock);
+    retval = ctx->videolist;
+    if (retval)
+    {
+        ctx->videolist = retval->next;
+        retval->next = NULL;
+        if (ctx->videolist == NULL)
+            ctx->videolisttail = NULL;
+        assert(ctx->videocount > 0);
+        ctx->videocount--;
+    } // if
+    Mutex_Unlock(ctx->lock);
+
+    return retval;
+} // THEORAPLAY_getVideo
+
+
+void THEORAPLAY_freeVideo(const THEORAPLAY_VideoFrame *_item)
+{
+    THEORAPLAY_VideoFrame *item = (THEORAPLAY_VideoFrame *) _item;
+    if (item != NULL)
+    {
+        assert(item->next == NULL);
+        free(item->pixels);
+        free(item);
+    } // if
+} // THEORAPLAY_freeVideo
+
+// end of theoraplay.cpp ...
 

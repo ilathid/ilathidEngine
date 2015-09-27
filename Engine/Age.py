@@ -55,14 +55,17 @@ def unpackGeom3d(node):
             y1 = hy / 1024.0
             y2 = (hy+hh) / 1024.0
             geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
-            side_start = side_start + 1
+            side_start = (side_start + 1) % 4
             # TODO does side_start need % here?
         
+        # in case of wrapping
+        side_start = side_start % 4
         x1 = 0
         x2 = ((hx+hw) % 1024) / 1024.0
         y1 = hy / 1024.0
         y2 = (hy+hh) / 1024.0
         
+        print "side start: %d" % (side_start)
         geoms.append(geomFromSide(sides[side_start], (x1, y1), (x2, y2)))
     return geoms    
 
@@ -120,7 +123,7 @@ class Age(object):
         #self._blk  = threading.Semaphore(1)
         
         # Parse xml file
-        fpfile = fpxml.getFile()
+        fpfile = fpxml.open()
         xmlfile = xml.dom.minidom.parse(fpfile)
         fpfile.close()
         
@@ -129,12 +132,16 @@ class Age(object):
         
         rootnode = xmlfile.childNodes[0]
         
+        if not rootnode.hasAttribute("name"):
+            raise Exception("Age root node needs a 'name' attribute")
         self._name = rootnode.getAttribute("name")
+        if not rootnode.hasAttribute("start"):
+            raise Exception("Age root node needs a 'start' attribute")
         
         # TODO: When a player asks to go to an age, and doesn't specify a slide, 
         # maybe this can be used.
         # Right now linking to ages requires age.slide, so that the target slide is
-        # always specified. So it may make sense to scrap this variable.
+        # always specified.
         self._firstSlide = rootnode.getAttribute("start")
         
         for node in rootnode.childNodes:
@@ -170,7 +177,7 @@ class Age(object):
                 filename = "slides/" + getText(filenode.childNodes)
                 
                 if filenode.hasAttribute('archive'):
-                    archive = Archive(filenode.getAttribute('archive'), self.params)
+                    archive = Archive(filenode.getAttribute('archive'), self.params.file_loc)
                 else:
                     archive = self.arch
                 filepaths.append(FilePath(filename, archive))
@@ -181,7 +188,7 @@ class Age(object):
             filename = "slides/" + getText(filenode.childNodes)
             
             if filenode.hasAttribute('archive'):
-                archive = Archive(filenode.getAttribute('archive'), self.params)
+                archive = Archive(filenode.getAttribute('archive'), self.params.file_loc)
             else:
                 archive = self.arch
             
@@ -227,7 +234,7 @@ class Age(object):
         
     def _readhotspot(self, node, s):
         cursortype = node.getAttribute('cursor')
-        
+        print "Read Hotspot for slide " + s.name
         destOrientation = 0
         if node.hasAttribute('destOrientation'):
             destOrientation = node.getAttribute('destOrientation')
@@ -274,7 +281,7 @@ class Age(object):
         filename = "images/" + getText(filenode.childNodes)
         
         if filenode.hasAttribute('archive'):
-            archive = Archive(filenode.getAttribute('archive'), self.params)
+            archive = Archive(filenode.getAttribute('archive'), self.params.file_loc)
         else:
             archive = self.arch
 
@@ -338,7 +345,12 @@ class Age(object):
     def getName(self):
         return self.ageName
 
+    def getFirstSlide(self):
+        return self._slides[self._firstSlide]
+
     def getSlide(self, name):
+        if not name in self._slides:
+            raise Exception("No such slide: %s in age %s" % (name, self._name))
         return self._slides[name]
     
     def getAllSlides(self):

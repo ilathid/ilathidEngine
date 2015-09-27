@@ -81,7 +81,10 @@ class SlideManager:
             return self.age_manager.getAge().getSlide(self.current_slide)
         else:
             return None
-        
+    
+    def setAge(self, age):
+        self.setSlide("%s." % age)
+    
     def setSlide(self, slide):
         """ slide is a string """
         # on exit
@@ -99,8 +102,12 @@ class SlideManager:
             newAge = self.age_manager.getAge()
             newSlide = newAge.getSlide(parts[0])
         elif len(parts) == 2:
-            newAge = self.age_manager.setAge(parts[0])
-            newSlide = newAge.getSlide(parts[1])
+            if len(parts[1]) > 0:
+                newAge = self.age_manager.setAge(parts[0])
+                newSlide = newAge.getSlide(parts[1])
+            else:
+                newAge = self.age_manager.setAge(parts[0])
+                newSlide = newAge.getFirstSlide()
         else:
             raise Exception('SlideManager: Must be a 1 or 2 part slide name.')
 

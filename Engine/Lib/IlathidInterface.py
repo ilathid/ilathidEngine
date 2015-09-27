@@ -48,10 +48,23 @@ class LogBar():
     def __init__(self):
         # Poke a hole through to the logger...
         Logger.addCallback(self.getMessage)
+        (sw, sh) = Parameters.windowsize
         
-        # Archive
-        self.arch = Archive("Interface", {"type":"file", "file_loc":"Data"})
+        self.arch = Archive("Interface", "Data")
         self.font_file = FilePath('AC.TTF', self.arch)
+        
+        # What is the image
+        #abButtonFP = FilePath("AgeBrowser.png", self.arch)
+        #abButtonFile = abButtonFP.open()
+        # The following two lines should be one
+        #self.abButtonTex = GLTexture()
+        #self.abButtonTex.imageTexture(abButtonFile, alpha=None)
+        # close the file
+        #abButtonFile.close()
+        # on-screen geometry of the button
+        #self.abButton = Geometry2d([(sw-64,0),(sw-64,64),(sw,64),(sw,0)])
+        #self.abButtonHS = EngineHotspot(self.interface.engine, self.abButton, dest="AgeBrowser", cursor="forward")
+        
 #        self.font_file = FilePath('avgardn.ttf', self.arch)
 #        self.font_file = FilePath('Ilathidhi01.ttf', self.arch)
         Logger.log("<b>Init: </b> IlathidInterface")
@@ -114,15 +127,17 @@ class LogBar():
             geom.setPosition((0,sh-height+self.y))
             geom.renderPolygon(rgb=(.5,.55,.55, .9), filled=True)
             geom.renderTexture(tex)
-
+            
+        # Age Browser Button
+        #self.abButton.renderTexture(self.abButtonTex)
 
 class IlathidInterface(EngineLayer):
-    def __init__(self):
+    def __init__(self, engine):
+        self.engine = engine
         # Note: I'm not sure what else to do here...
         #self.height = Parameters.ifSet("II_height", 30)
         #self.height_sens = Parameters.ifSet("II_hover_height", 10)
         #self.hover_timer_max = Parameters.ifSet("II_hover_timer", 1)
-
         self.logBar = LogBar()
         
     def doEvents(self, events, dt):

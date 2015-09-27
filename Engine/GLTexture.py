@@ -37,7 +37,7 @@ class GLTexture:
         """ Load a texture from a font, by font filename. """
         # Could have passed a font object itself, would this have been a good idea?
         
-        fio = filepath.getFile()
+        fio = filepath.open()
         font = pygame.font.Font(fio, size)
 
         surfs = []
