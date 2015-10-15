@@ -1,8 +1,16 @@
 #include "SDL.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+
+#ifndef MIXER_H
+#define MIXER_H
+
+// forward defininition
+struct MediaPlayer;
+int mp_getAudio(struct MediaPlayer *mp, float *data, int len);
 
 // for testing:
 // cc -I/usr/local/include/SDL -c mixer.c -o mixer.o
@@ -25,15 +33,12 @@
 #define ACHANNELS 2
 #define ASAMPLEFREQ 22050
 #define AFORMAT AUDIO_S16SYS // please use signed or unsigned, not float
-#define ABITSIZE SDL_AUDIO_BITSIZE(AFORMAT & SDL_AUDIO_MASK_BITSIZE)
+#define ABITSIZE SDL_AUDIO_BITSIZE(AFORMAT & SDL_AUDIO_MASK_BITSIZE) // bits per sample
 
-// dummy
-typedef struct MediaPlayer {
-    Uint16 audio_format;
-    int audio_channels;
-    int audio_freq;
-    int (*get_audio)(Uint8 *stream, int len); // like copy from SDL. return value is 0 normally, 1 to terminate the stream
-} MediaPlayer;
+
+#define MIXER_STR_CONT	0
+#define MIXER_STR_CLOSE	1
+#define MIXER_STR_END	2
 
 /*Function to find minimum of x and y*/
 static int min(int x, int y)
@@ -49,17 +54,23 @@ static int max(int x, int y)
 
 // classes can be added, not removed.
 typedef struct AudioClass {
-    char *name;
+    const char *name;
     int volume; // 0 to 255
 } AudioClass;
 
 // Streams can be removed
 typedef struct AudioStream {
     int class;
-    MediaPlayer *mp;
+    struct MediaPlayer *mp;
     //int (*callback)(Uint8 *stream, int vol, int len); // like copy from SDL. return value is 0 normally, 1 to terminate the stream
     struct AudioStream *next;
-    SDL_AudioCVT cvt; // contains a buffer and used for conversion
+    float *buffer;
+    int buflen;
+    int got_len;
+    int flag;
+    
+    // info
+    int input_channels;
 } AudioStream;
 
 typedef struct AudioMixer {
@@ -75,5 +86,11 @@ typedef struct AudioMixer {
     SDL_AudioSpec spec;
 } AudioMixer;
 
-void mixer_new_stream(MediaPlayer *mp, char *class);
+void mixer_new_class(const char *class);
+AudioStream *mixer_new_stream(struct MediaPlayer *mp, const char *class, int num_channels);
+void mixer_close_stream(AudioStream *str);
+void mixer_end_stream(AudioStream *str);
 void mixer_init();
+void mixer_close();
+
+#endif

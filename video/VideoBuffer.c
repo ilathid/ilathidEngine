@@ -19,7 +19,7 @@ void VBInit(VBuffer *buf, int bufsize, int vfsize)
 void VBdestroy(VBuffer *buf)
 {
     int k;
-    for( k=0; k<bufsize; k++)
+    for( k=0; k<buf->bufsize; k++)
         free(buf->buffer[k].pixels);
     free(buf->buffer);
     // MptMutDestroy(buf->lenlock);
@@ -28,9 +28,9 @@ void VBdestroy(VBuffer *buf)
 // get a reference to the next 'write' item.
 VideoFrame *VBgetAddItem(VBuffer *buf)
 {
-    VideoFrame f;
+    VideoFrame *f;
     int head = (buf->tail + buf->len) % buf->bufsize;
-    f = buf->buffer[head];
+    f = buf->buffer + head;
     
     // CMutLock(buf->lenlock);
     buf->len++;
@@ -43,21 +43,22 @@ VideoFrame *VBpeak(VBuffer *buf)
 {
 	if(buf->len <= 0)
 		return NULL;
-	return buf->buffer[buf->tail];
+	return buf->buffer + buf->tail;
 } // end VBpeak
 
 // get a reference to the next 'read' item while also removing it
 VideoFrame *VBgetRemoveItem(VBuffer *buf)
 {
-    VideoFrame f;
+    VideoFrame *f;
     if(buf->len <= 0)
 		return NULL;
 		
-    f = buf->buffer[buf->tail];
+    f = buf->buffer + buf->tail;
     buf->tail = (buf->tail + 1) % buf->bufsize;
     // CMutLock(buf->lenlock);
     buf->len--;
     // CMutUnlock(buf->lenlock);
+    return f;
 } // end VBgetRemoveItem
 
 // how much space left on the buffer?

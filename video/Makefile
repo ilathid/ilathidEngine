@@ -1,27 +1,27 @@
 CC=cc
-CFLAGS=-fno-strict-aliasing -O2 -pipe -fno-strict-aliasing -DNDEBUG -O2 -pipe -fno-strict-aliasing -fPIC -I. -I/usr/local/include -I/usr/local/include/python2.7 -g2 -Wformat
+CFLAGS=-fno-strict-aliasing -O2 -pipe -fno-strict-aliasing -DNDEBUG -O2 -pipe -fno-strict-aliasing -fPIC -I. -I/usr/local/include -g2 -Wformat
 DEPS = MediaPlayer.h alibrary.h timehelper.h packetbuffer.h
 
-mixer.o: mixer.c
-	cc -I/usr/local/include/SDL -c mixer.c -o mixer.o
+.PHONY: all
+all:  libMPPool.so.1
 
-test: test.o packetbuffer.o alibrary.o timehelper.o MediaPlayer.o
-	$(CC) $(CFLAGS) test.o packetbuffer.o alibrary.o timehelper.o MediaPlayer.o -L. -L/usr/local/lib -lm -lavutil -lavformat -lavcodec -lswscale -lao -lpthread -lrt -o test
+Mixer.o: Mixer.c
+	cc $(CFLAGS) -I/usr/local/include/SDL -c Mixer.c -o Mixer.o
 
+VideoBuffer.o: VideoBuffer.c
+	cc $(CFLAGS) -c VideoBuffer.c -o VideoBuffer.o
+
+MediaDecoder.o: MediaDecoder.c
+	cc $(CFLAGS) -I/usr/local/include/SDL -c MediaDecoder.c -o MediaDecoder.o
+	
 MediaPlayer.o: MediaPlayer.c
-	$(CC) $(CFLAGS) -c MediaPlayer.c -o MediaPlayer.o
+	cc $(CFLAGS) -I/usr/local/include/SDL -c MediaPlayer.c -o MediaPlayer.o
 
-timehelper.o: timehelper.c
-	$(CC) $(CFLAGS) -c timehelper.c -o timehelper.o
-	
-alibrary.o: alibrary.c
-	$(CC) $(CFLAGS) -c alibrary.c -o alibrary.o
-	
-packetbuffer.o: packetbuffer.c
-	$(CC) $(CFLAGS) -c packetbuffer.c -o packetbuffer.o
-	
-test.o: test.c
-	$(CC) $(CFLAGS) -c test.c -o test.o
+mpGLUpdate.o: mpGLUpdate.c
+	cc $(CFLAGS) -I/usr/local/include/GL -c mpGLUpdate.c -o mpGLUpdate.o
 
-clean:
-	rm -f test test.o packetbuffer.o alibrary.o timehelper.o MediaPlayer.o
+MPPool.o: MPPool.c
+	cc $(CFLAGS) -I/usr/local/include/SDL -c MPPool.c -o MPPool.o
+
+libMPPool.so.1: Mixer.o VideoBuffer.o MediaDecoder.o MediaPlayer.o MPPool.o mpGLUpdate.o
+	cc -shared -Wl,-soname,libMPPool.so.1 -o libMPPool.so.1.0 Mixer.o VideoBuffer.o MediaDecoder.o MediaPlayer.o MPPool.o -lc

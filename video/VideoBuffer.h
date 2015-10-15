@@ -1,11 +1,17 @@
-#include "MPthreading.h"
-#include "MediaDecoder.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifndef VIDEOBUFFER_H
 #define VIDEOBUFFER_H
 
-typedef struc VBuffer{
-    char *buffer;
+typedef struct VideoFrame{
+    // timestamp
+    char *pixels;
+    int async;
+} VideoFrame;
+
+typedef struct VBuffer{
+    VideoFrame *buffer;
     int bufsize;
     int tail;
     int len;
