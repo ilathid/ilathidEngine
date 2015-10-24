@@ -1,6 +1,11 @@
 #include "glew.h"
 #include "gl.h"
 #include <string.h>
+#include <stdio.h>
+
+/**
+ * Thiis isn't working. Right now my only choice is to work to pass this code into python?
+ * */
 
 GLuint shader_program = 0;
 
@@ -41,8 +46,17 @@ static const char *glsl_yuv_fragment =
 
 
 
-static int init_shaders()
+int init_shaders()
 {
+	printf("initializing shaders\n");
+
+	GLenum err = glewInit();
+	if (GLEW_OK != err)
+	{
+	  /* Problem: glewInit failed, something is seriously wrong. */
+	  fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+	}
+	
     const char *vertexsrc = glsl_vertex;
     const char *fragmentsrc = NULL;
     GLuint vertex = 0;
@@ -53,18 +67,27 @@ static int init_shaders()
 
 	fragmentsrc = glsl_yuv_fragment;
     
+    printf("pointed to code\n");
+    
     ok = 0;
     shaderlen = (GLint) strlen(vertexsrc);
+    printf("got length\n");
     vertex = glCreateShader(GL_VERTEX_SHADER);
+    printf("created shader?\n");
     glShaderSource(vertex, 1, (const GLchar **) &vertexsrc, &shaderlen);
+    printf("pointed to source?\n");
     glCompileShader(vertex);
+    printf("compiled shader?\n");
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &ok);
+    printf("more...\n");
     if (!ok)
     {
         glDeleteShader(vertex);
         return 0;
     } // if
-
+	
+	printf("able to compile vertex\n");
+	
     ok = 0;
     shaderlen = (GLint) strlen(fragmentsrc);
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
@@ -76,6 +99,7 @@ static int init_shaders()
         glDeleteShader(fragment);
         return 0;
     } // if
+	printf("able to compile fragment\n");
 
     ok = 0;
     shader_program = glCreateProgram();
@@ -92,8 +116,7 @@ static int init_shaders()
         glDeleteProgram(shader_program);
         return 0;
     } // if
-
-
+	printf("able to compile shader_program\n");
 
 	glUniform1i(glGetUniformLocation(shader_program, "samp0"), 0);
 	glUniform1i(glGetUniformLocation(shader_program, "samp1"), 1);
@@ -118,11 +141,11 @@ void update_tex(char *pixels, int gltex, int w, int h)
 	GLuint tex = (GLuint)gltex;
 	
 	// turn on the global yuv shader
-	if(shader_program == 0)
-		init_shaders();
+	//if(shader_program == 0)
+	//	init_shaders();
 	
-    glUseProgram(shader_program);
+    //glUseProgram(shader_program);
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels);
-	glUseProgram(0);
+	//glUseProgram(0);
 }

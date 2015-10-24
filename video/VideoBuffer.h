@@ -7,7 +7,7 @@
 typedef struct VideoFrame{
     // timestamp
     char *pixels;
-    int async;
+    int vindex;
 } VideoFrame;
 
 typedef struct VBuffer{
@@ -19,7 +19,7 @@ typedef struct VBuffer{
 } VBuffer;
 
 // P(ointer) buffer
-void VBinit(VBuffer *buf, int bufsize);
+void VBinit(VBuffer *buf, int bufsize, int vfsize);
 void VBdestroy(VBuffer *buf);
 
 // get a reference to the next 'push' item. grrr, ie get an invalid item, and overwrite its contents

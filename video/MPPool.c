@@ -33,12 +33,19 @@ void MPP_remove(int mp_id)
 	MPP_exists[mp_id] = 0;
 }
 
+
+
+
 // access functions
-void MPP_init(int mp, const char *filename, int looping, const char *audio_class, int gltex)
+int MPP_create(const char *filename, int looping, const char *audio_class)
 {
-    mp_init(MPP_get(mp), filename, looping, audio_class, gltex);
+	int mp = MPP_new();
+    mp_init(MPP_get(mp), filename, looping, audio_class);
+    return mp;
 }
 void MPP_play(int mp) { mp_play(MPP_get(mp)); }
 void MPP_stop(int mp) { mp_stop(MPP_get(mp)); }
 void MPP_close(int mp) { mp_close(MPP_get(mp)); }
-void MPP_init_shaders() { init_shaders(); }
+int MPP_getWidth(int mp) { return mp_getWidth(MPP_get(mp)); }
+int MPP_getHeight(int mp) { return mp_getHeight(MPP_get(mp)); }
+// void MPP_init_shaders() { init_shaders(); }

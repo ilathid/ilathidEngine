@@ -1,6 +1,6 @@
 #include "VideoBuffer.h"
 
-void VBInit(VBuffer *buf, int bufsize, int vfsize)
+void VBinit(VBuffer *buf, int bufsize, int vfsize)
 {
     int k;
     buf->bufsize = bufsize; // maximum amnt of data that can be put on the buffer
@@ -11,7 +11,7 @@ void VBInit(VBuffer *buf, int bufsize, int vfsize)
     
     for(k=0;k<bufsize;k++)
     {
-        buf->buffer[k].async = -1;
+        buf->buffer[k].vindex = -1;
         buf->buffer[k].pixels = (char *)malloc(sizeof(char) * vfsize);
     } // end for
 } // end VBinit

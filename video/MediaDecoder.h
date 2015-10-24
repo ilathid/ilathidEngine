@@ -11,16 +11,16 @@
 #include "Mixer.h"
 
 #ifdef _WIN32
-#include <windows.h>
-#define MPTmut	HANDLE
-#define MPTthr	HANDLE
-#define MPTtimer	SYSTEMTIME
+#   include <windows.h>
+#   define MPTmut	HANDLE
+#   define MPTthr	HANDLE
+#   define MPTtimer	SYSTEMTIME
 #else
-#include <pthread.h>
-#include <unistd.h>
-#define MPTmut	pthread_mutex_t
-#define MPTthr	pthread_t
-#define MPTtimer	struct timeval
+#   include <pthread.h>
+#   include <unistd.h>
+#   define MPTmut	pthread_mutex_t
+#   define MPTthr	pthread_t
+#   define MPTtimer	struct timeval
 #endif
 
 #ifndef MEDIADECODER_H
@@ -94,39 +94,45 @@ static void MptThrExit()
 #	endif
 }
 
-static void MptMutCreate(MPTmut mut)
+static MPTmut *MptMutCreate()
 {
+    MPTmut *mut;
 #	ifdef _WIN32
     mut = CreateMutex(NULL, 0, NULL);
 #	else
-    pthread_mutex_init(&mut, NULL);
+    // need a malloc to copy windows!
+    mut = (MPTmut *)malloc(sizeof(MPTmut));
+    if(pthread_mutex_init(mut, NULL))
+        return NULL;
+#	endif
+    return mut;
+}
+
+static void MptMutDestroy(MPTmut *mut)
+{
+#	ifdef _WIN32
+    CloseHandle(mut[0]);
+#	else
+    pthread_mutex_destroy(mut);
+    free(mut);
 #	endif
 }
 
-static void MptMutDestroy(MPTmut mut)
+static void MptMutLock(MPTmut *mut)
 {
 #	ifdef _WIN32
-    CloseHandle(mut);
+    WaitForSingleObject(mut[0], INFINITE);
 #	else
-    pthread_mutex_destroy(&mut);
+    pthread_mutex_lock(mut);
 #	endif
 }
 
-static void MptMutLock(MPTmut mut)
+static void MptMutUnlock(MPTmut *mut)
 {
 #	ifdef _WIN32
-    WaitForSingleObject(mut, INFINITE);
+    ReleaseMutex(mut[0]);
 #	else
-    pthread_mutex_lock(&mut);
-#	endif
-}
-
-static void MptMutUnlock(MPTmut mut)
-{
-#	ifdef _WIN32
-    ReleaseMutex(mut);
-#	else
-    pthread_mutex_unlock(&mut);
+    pthread_mutex_unlock(mut);
 #	endif
 }
 
@@ -158,8 +164,23 @@ typedef struct MediaDecoder{
     char *aBuffer;
     int bps; // bytes per sample
     int abufsize;
-    int abuflen;
-    MPTmut ablenmut;
+    int abufhead;
+    int abuftail;
+    int abuffull;
+    int toskipaudio;
+    //  [	t-------h	]
+    //  [-------h	t-------]
+    //  [---h		    t---]
+    //  full when h==t, empty when t==h-s
+    // 
+    //  len = (h - t + s)
+    //  if( h != t ) len = len % s;
+    // 
+    //  When h==t, he get len=s, ie the buffer is full
+    //  When h==t-s, we get len=0, ie the buffer is empty
+    //  Otherwise, we get the correct length
+    
+    // MPTmut *ablenmut;
     long acnt;
     int vcnt;
     
@@ -169,15 +190,37 @@ typedef struct MediaDecoder{
     
 } MediaDecoder;
 
-void md_init(MediaDecoder *md, const char *filename, int abufsize);
+// create the decoder, open the file, init the decoders
+void md_init(MediaDecoder *md, const char *filename, int abufsize, int vbufsize);
+
+// put some data on the buffers
+int md_incBuffers(MediaDecoder *md);
+// fill the buffers
 int md_fillBuffers(MediaDecoder *md);
-VideoFrame *md_getVideo(MediaDecoder *md, int asample);
-int md_getNextVideoSync(MediaDecoder *md);
+
+// get the next video frame
+VideoFrame *md_getVideo(MediaDecoder *md);
+
+// get video frame index n, skipping any inbetween. Return NULL if n is not available
+// VideoFrame *md_getVideo_n(MediaDecoder *md, int n);
+
+// int md_getNextVideoSync(MediaDecoder *md);
 int md_getNextSampleNum(MediaDecoder *md);
+
+// get the index number of the next video frame
+int md_getNextVideoIndex(MediaDecoder *md);
+
+// get len data points of audio (ie len/channels number of samples)
 int md_getAudio(MediaDecoder *md, float *data, int len);
+
+// get time remaining on audio buffer
 int md_getAudioTime(MediaDecoder *md);
-int md_skipAudio(MediaDecoder *md, int samples);
+
+void md_skipAudio(MediaDecoder *md, int samples);
 void md_close(MediaDecoder *md);
 void md_reset(MediaDecoder *md, int clear_buffers);
+
+int time2vindex(MediaDecoder *md, int time_ms);
+int vindex2time(MediaDecoder *md, int vindex);
 
 #endif

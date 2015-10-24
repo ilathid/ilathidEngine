@@ -30,8 +30,12 @@ int mp_getAudio(struct MediaPlayer *mp, float *data, int len);
 
 // len is of size 2048 x 2 x 2 (samples in buffer, channels, 16 bits = 2 bytes)
 #define ABUFLEN 2048
+//#define ABUFLEN 4096
+//#define ABUFLEN 8192
 #define ACHANNELS 2
-#define ASAMPLEFREQ 22050
+//#define ASAMPLEFREQ 22050
+//#define ASAMPLEFREQ 44100
+#define ASAMPLEFREQ 48000
 #define AFORMAT AUDIO_S16SYS // please use signed or unsigned, not float
 #define ABITSIZE SDL_AUDIO_BITSIZE(AFORMAT & SDL_AUDIO_MASK_BITSIZE) // bits per sample
 
@@ -83,10 +87,11 @@ typedef struct AudioMixer {
     AudioStream *stream_last;
     
     // SDL
-    SDL_AudioSpec spec;
+    SDL_AudioSpec *spec;
 } AudioMixer;
 
 void mixer_new_class(const char *class);
+void mixer_set_volume(const char *class, int volume);
 AudioStream *mixer_new_stream(struct MediaPlayer *mp, const char *class, int num_channels);
 void mixer_close_stream(AudioStream *str);
 void mixer_end_stream(AudioStream *str);
