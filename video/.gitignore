@@ -1,0 +1,6 @@
+*.ogv
+*.ogg
+*.o
+totest
+*.so.*
+*.core
