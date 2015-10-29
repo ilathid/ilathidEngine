@@ -31,6 +31,7 @@ int mp_getWidth(MediaPlayer *mp);
 int mp_getHeight(MediaPlayer *mp);
 int mp_hasAudio(MediaPlayer *mp);
 int mp_hasVideo(MediaPlayer *mp);
+int mp_isPlaying(MediaPlayer *mp);
 int mp_getAudio(MediaPlayer *mp, float *data, int len);
 
 #endif

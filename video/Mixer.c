@@ -5,8 +5,6 @@
 Changes:
 - all data in is in pcm float format. We do a conversion to the desired output
 - audio will be naievly converted up or down to the number of channels desired
-
-
 */
 
 AudioMixer mixer;
@@ -176,6 +174,11 @@ void mixer_set_volume(const char *class, int volume)
     }
     mixer.classes[k].volume = volume;
     // printf("Set volume to %d\n", volume);
+}
+
+int mixer_buf_time()
+{
+    return (1000*ABUFLEN) / mixer.spec->freq;
 }
 
 AudioStream *mixer_new_stream(struct MediaPlayer *mp, const char *class, int num_channels)

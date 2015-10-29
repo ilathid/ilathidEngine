@@ -19,17 +19,33 @@ void updatevid(char *pixels, void *funcdata)
     const Uint8 *v = u + ((w/2) * (h/2));
     
     SDL_LockYUVOverlay(mov);
-    dst = mov->pixels[0];
-    for (i = 0; i < h; i++, y += w, dst += mov->pitches[0])
-        memcpy(dst, y, w);
+    
+    // This optimization helps a lot when this condition is satisfied, which seems often
+    if(w == mov->pitches[0] && w == 2*mov->pitches[1] && w == 2*mov->pitches[2])
+    {
+        dst = mov->pixels[0];
+        memcpy(dst, y, w*h);
+        
+        dst = mov->pixels[1];
+        memcpy(dst, u, (w*h)/4);
 
-    dst = mov->pixels[1];
-    for (i = 0; i < h/2; i++, u += w/2, dst += mov->pitches[1])
-        memcpy(dst, u, w/2);
+        dst = mov->pixels[2];
+        memcpy(dst, v, (w*h)/4);
+    }
+    else
+    {
+        dst = mov->pixels[0];
+        for (i = 0; i < h; i++, y += w, dst += mov->pitches[0])
+            memcpy(dst, y, w);
 
-    dst = mov->pixels[2];
-    for (i = 0; i < h/2; i++, v += w/2, dst += mov->pitches[1])
-        memcpy(dst, v, w/2);
+        dst = mov->pixels[1];
+        for (i = 0; i < h/2; i++, u += w/2, dst += mov->pitches[1])
+            memcpy(dst, u, w/2);
+
+        dst = mov->pixels[2];
+        for (i = 0; i < h/2; i++, v += w/2, dst += mov->pitches[1])
+            memcpy(dst, v, w/2);
+    }
 
     SDL_UnlockYUVOverlay(mov);   
     SDL_DisplayYUVOverlay(mov, &dstrect);
@@ -61,6 +77,8 @@ int main()
     //mp1 = MPP_create("./test.ogg", 0, "sfx_quiet");
     //mp2 = MPP_create("./small.ogv", 0, "sfx");
     mp2 = MPP_create("./big_buck_bunny_480p.ogv", 0, "sfx");
+    //mp2 = MPP_create("./sintel_trailer-720p.ogv", 0, "sfx");
+    //mp2 = MPP_create("./sintel_trailer-1080p.ogv", 0, "sfx");
     //mp4 = MPP_create("./big_buck_bunny_480p.ogv", 0, "sfx");
     //mp5 = MPP_create("./big_buck_bunny_480p.ogv", 0, "sfx");
     
@@ -76,7 +94,11 @@ int main()
     }
     
     MPP_play(mp2);
-    sleep(7);
+    //sleep(5);
+    //usleep(50000);
+    
+    while(mp_isPlaying(mp2p)) sleep(1);
+    
     /*
     MPP_play(mp1);
     sleep(2);

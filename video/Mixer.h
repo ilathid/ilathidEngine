@@ -97,5 +97,6 @@ void mixer_close_stream(AudioStream *str);
 void mixer_end_stream(AudioStream *str);
 void mixer_init();
 void mixer_close();
+int mixer_buf_time();
 
 #endif

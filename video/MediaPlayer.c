@@ -21,7 +21,7 @@ void mp_init(MediaPlayer *mp, const char *filename, int looping, const char *aud
 	// opens the playback file and preps the decoders
 	mp->md = (MediaDecoder *)malloc(sizeof(MediaDecoder));
     printf("initializing md\n");
-	md_init(mp->md, filename, 16*ABUFLEN, 24);
+	md_init(mp->md, filename, 16*4*ABUFLEN, 24);
 	
     mp->vidcbk = NULL;
     
@@ -102,14 +102,21 @@ int mp_getHeight(MediaPlayer *mp)
 int mp_hasAudio(MediaPlayer *mp) { return mp->md->has_audio; }
 int mp_hasVideo(MediaPlayer *mp) { return mp->md->has_video; }
 
+int mp_isPlaying(MediaPlayer *mp)
+{
+    return mp->state == MP_PLAY;
+}
+
 // todo a media player can be given an external timer. How would this work?
 static void *_worker_thread(void *data)
 {
-	MPTtimer ctimer; int stime;
+	MPTtimer ctimer; int stime, mixer_btime;
 	// also need: flag for stop
 	int exitloop = 0;
 	int looping = 1;
 	
+    mixer_btime = mixer_buf_time();
+    
 	// could use pthread_cond_wait to pause the thread, but because I can,
 	// I believe it is better to destroy the thread and then recreate it,
 	// only keeping the decoder state.	
@@ -119,41 +126,101 @@ static void *_worker_thread(void *data)
 	if(!mp->md->has_audio && !mp->md->has_video)
 		exitloop = 1;
 	
-    // TODO I want the option to take in an external timer
-	ctimer = MptTimer();
-	
     if( mp->md->has_video )
-        stime = vindex2time(mp->md, 1);
+        stime = vindex2time(mp->md, 1)-10;
     else if( mp->md->has_audio )
         stime = (1000*ABUFLEN) / mp->md->vinfo.rate;
+    
+    printf("Sleep time is %d\n", stime);
     
 	// stop should reset the decoder state and stop the playback thread (??)
 	while(!exitloop)
 	{
         printf("play!\n");
+        // read the first page
+        if(mp->state == MP_STOP || md_readPage(mp->md)) exitloop = 1;
+        
+        // TODO I want the option to take in an external timer
+        ctimer = MptTimer();
+        
 		while(!exitloop)
 		{
 			int buffull, res, vtime, atime, ctime;
 			VideoFrame *frm;
-            printf("\n");
+            // printf("\n");
 			
             // res = md_fillBuffers(mp->md);
+            // TODO: issue: this function may have to be called multiple times per video packet that gets outputed
+            // Sleep time will be too high, since there are more calls to this function then there are video frames
+            // prepaired for output. Especially large video frame sizes.
+            
+            // respk =
+            //    2 there is no video, and audio buffer is full
+            //    1 there is no video, and we are out of audio packets
+            //    2 there is video, and the video buffer is full
+            //    1 there is video, and we are out of video packets
+            //    0 there is video, and a video frame was decoded.
+            
+            // respg =
+            //    0 on success
+            //    1 indicates end of stream, or stream failure.
+            if(!mp->md->has_video)
+            {
+                int respk;
+                int respg = 0;
+                // read a single page, as long as there is room on the buffer
+                respk = md_processPackets(mp->md);
+                if(respk == 1)
+                {
+                    respg = md_readPage(mp->md);
+                    if(!respg)
+                        respk = md_processPackets(mp->md);
+                }
+                buffull = (respk == 2);
+                exitloop = (respg == 1);
+            }
+            else
+            {
+                int respk;
+                int respg = 0;
+                // read pages until the buffers are full, or until at least 1 video frame is rendered
+                respk = md_processPackets(mp->md);
+                while(respk == 1)
+                {
+                    respg = md_readPage(mp->md);
+                    if(respg) break; // no new page: end of stream
+                    respk = md_processPackets(mp->md);
+                }
+                buffull = (respk == 2);
+                exitloop = (respg == 1);
+            }
+            exitloop |= (mp->state == MP_STOP);
+            
+            // respk = 0: a new video frame was rendered. We can sleep?
+            
+            
+            /*
             res = md_incBuffers(mp->md);
             buffull = (res < 0);
-            if(buffull)
-                printf("    buffers are full\n");
-            else
-                printf("    res=%d\n", res);
+            
+            //if(buffull)
+            //    printf("    buffers are full\n");
+            //else
+            //    printf("    res=%d\n", res);
             
             // res > 0 indicates eof or file read failure, and we have no more data to play.
 			if(res > 0 || mp->state == MP_STOP) exitloop = 1;
+            */
             if(exitloop) printf("   Will Exit\n");
 			
-            // check if it is time to show the video, and otherwise how long should we pause?
-            ctime = MptGetTime( ctimer );
-            if( mp_hasAudio(mp) && mp_hasVideo(mp))
-                printf("    Playback time: %d (sample %ld, frame %d)\n", ctime, (ctime*mp->md->vinfo.rate) / 1000, time2vindex(mp->md, ctime));
             
+            
+            // check if it is time to show the video, and otherwise how long should we pause?
+            ctime = MptGetTime( ctimer ) - mixer_btime;
+            // printf("ctime - %d = %d\n", mixer_btime, ctime);
+            
+            //if( mp_hasAudio(mp) && mp_hasVideo(mp))
+            //    printf("    Playback time: %d (sample %ld, frame %d)\n", ctime, (ctime*mp->md->vinfo.rate) / 1000, time2vindex(mp->md, ctime));
             // if it is time, process a video frame
             if( mp->md->has_video )
             {
@@ -161,10 +228,13 @@ static void *_worker_thread(void *data)
                 // vtime = vindex2time(mp->md, md_getNextVideoIndex(mp->md));
                 vtime = md_getNextVideoIndex(mp->md);
                 
+                if(vtime != -1) exitloop = 0;
+                
                 // when we find the right frame to display OR there is no 'next' frame,
                 // then we either have the frame or ran out
                 // printf("    Comparing %d and %d\n", vtime, time2vindex(mp->md, ctime));
-                while( vtime <= time2vindex(mp->md, ctime) && vtime != -1)
+                //printf("    vtime index offset %d\n", vtime - time2vindex(mp->md, ctime));
+                while( vtime != -1 && vtime <= time2vindex(mp->md, ctime))
                 {
                     if( frm != NULL )
                         printf("    Skipped a video frame %d\n", vtime);
@@ -175,7 +245,7 @@ static void *_worker_thread(void *data)
                 
                 if(frm != NULL && mp->vidcbk != NULL)
                 {
-                    printf("    Rendering Video %d\n", frm->vindex);
+                    // printf("    Rendering Video %d\n", frm->vindex);
                     mp->vidcbk(frm->pixels, mp->vidcbk_data);
                 }
             }
@@ -183,25 +253,36 @@ static void *_worker_thread(void *data)
             // skip audio if necessary
             if( mp->md->has_audio )
             {
+                int askiptime,adelaytime;
+                askiptime = 80;
+                adelaytime = 80;
                 // here I use atime as sample time
                 atime = (ctime * mp->md->vinfo.rate) / 1000;
-                printf("    current sample time: %d, vs %d on buffer\n", atime, md_getNextSampleNum(mp->md));
+                //printf("    current sample time: %d, vs %d on buffer\n", atime, md_getNextSampleNum(mp->md));
                 // there are as many as ABUFLEN data in the SDL audio buffer, but I ignore it
                 // convert atime to a difference between playback sample and current sample from stream
                 atime = atime - md_getNextSampleNum(mp->md);
-                if( atime > (80 * mp->md->vinfo.rate) / 1000) // 100 here is time
+                atime = (atime*1000) / mp->md->vinfo.rate;
+                // printf("    relative audio time %d (vs %d)\n", atime, askiptime);
+                if( atime > askiptime) // 100 here is time
                 {
+                    printf("Should skip! (%d)\n", atime - askiptime);
                     // buffull = 0;
-                    md_skipAudio(mp->md, atime);
-                    printf("    Skipped %d audio\n", atime);
+                    // md_skipAudio(mp->md, atime);
+                    // printf("    Skipped %d audio\n", atime);
                 }
+                else if(-atime > adelaytime)
+                {
+                    printf("Should delay! (%d)\n", -atime - askiptime);
+                    // md_delayAudio(mp->md, atime);
+                } 
             }
             
             // if the buffers are full, wait either until video time, or for a specified time (ie 100ms)
             if( buffull )
             {
                 // stime = 40;
-                printf("    Sleep for for %d \n", stime);
+                // printf("    Sleep for for %d \n", stime);
                 MptSleep( stime );
             }
 		} // exit on exitloop

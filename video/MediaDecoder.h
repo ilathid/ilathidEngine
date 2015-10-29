@@ -196,7 +196,12 @@ void md_init(MediaDecoder *md, const char *filename, int abufsize, int vbufsize)
 // put some data on the buffers
 int md_incBuffers(MediaDecoder *md);
 // fill the buffers
-int md_fillBuffers(MediaDecoder *md);
+// int md_fillBuffers(MediaDecoder *md);
+
+int md_readPage(MediaDecoder *md);
+
+int md_processPackets(MediaDecoder *md);
+
 
 // get the next video frame
 VideoFrame *md_getVideo(MediaDecoder *md);

@@ -1,7 +1,7 @@
 #include "MediaDecoder.h"
 
 static int _dovpacket(MediaDecoder *md, ogg_packet *packet);
-static void _dotpacket(MediaDecoder *md, ogg_packet *packet);
+static int _dotpacket(MediaDecoder *md, ogg_packet *packet);
 
 // took many variable names from theoraplay
 
@@ -355,7 +355,10 @@ static void _clearAPackets(MediaDecoder *md)
 {
     ogg_packet packet;
     while( _aHasRoom(md) && ogg_stream_packetout(&md->vstream, &packet) == 1)
+    {
+        printf("    Audio Packet\n");
         _dovpacket(md, &packet);
+    }
 }
 
 static void _clearVPackets(MediaDecoder *md)
@@ -364,7 +367,7 @@ static void _clearVPackets(MediaDecoder *md)
     int res;
     while(_vHasRoom(md) && (res = ogg_stream_packetout(&md->tstream, &packet)) == 1)
     {
-        // printf("clearv: res=%d\n", res);
+        printf("    Video Packet\n");
         _dotpacket(md, &packet);
     }
     // printf("Tried to get video: res=%d\n", res);
@@ -422,6 +425,76 @@ int md_incBuffers(MediaDecoder *md)
     return 0;
 }
 
+// Read packets until one more video frame is ready
+// Return values:
+//    2 there is no video, and audio buffer is full
+//    1 there is no video, and we are out of audio packets
+//    2 there is video, and the video buffer is full
+//    1 there is video, and we are out of video packets
+//    0 there is video, and a video frame was decoded.
+int md_processPackets(MediaDecoder *md)
+{
+    int res;
+    int need_video, need_audio;
+    ogg_packet packet;
+    
+    need_audio = md->has_audio;
+    need_video = md->has_video;
+    
+    // Clear vorbis packets
+    if(md->has_audio)
+    {
+        while( 1 )
+        {
+            if(!_aHasRoom(md))
+            {
+                if(md->has_video) break;
+                return 2; // buffers are full
+            }
+            res = ogg_stream_packetout(&md->vstream, &packet);
+            if(res != 1)
+            {
+                if( md->has_video ) break;
+                return 1; // need more pages
+            }
+            _dovpacket(md, &packet);
+        }
+    }
+    
+    // keep reading packets until at least 1 frame is ready
+    if(md->has_video)
+    {
+        while( 1 )
+        {
+            if(!_vHasRoom(md)) return 2; // buffers are full
+            res = ogg_stream_packetout(&md->tstream, &packet);
+            if(res != 1)
+            {
+                if(md->has_audio && !_aHasRoom(md)) return 2; // buffers are still full if audio is full
+                return 1; // need more pages
+            }
+            res = _dotpacket(md, &packet);
+            if(res == 0) return 0; // successfully read a video frame
+        }
+    }
+    
+    return 0; // never reached, unless there is no video and no audio
+}
+
+// returns 0 on success. 1 indicates end of stream, or stream failure.
+int md_readPage(MediaDecoder *md)
+{
+    int res;
+    ogg_page page;
+    res = _readOggPage(md, &page);
+    if(res) return 1;
+    if( md->has_audio && ogg_page_serialno(&page) == md->vstream.serialno )
+        ogg_stream_pagein(&md->vstream, &page);
+    if( md->has_video && ogg_page_serialno(&page) == md->tstream.serialno )
+        ogg_stream_pagein(&md->tstream, &page);
+    return 0;
+}
+
 int md_fillBuffers(MediaDecoder *md)
 {
     ogg_page page;
@@ -469,7 +542,26 @@ int md_fillBuffers(MediaDecoder *md)
     return res;
 }
 
+
+// Not counting work done in decoder itself:
+// 40% of playback time is in _worker_thread
+// 100% of _worker_thread time is in md_incBuffers
+// 14/16 of md_incBuffers time is in _clearVPackets -> _dotpackets
+// 13/14 of _dotpackets time is in _VideoClip
+// 
+// ie 32.5%
+// another 15% is in mixer_mix
+// probably most of the rest is in the decoders
+
+// From http://stackoverflow.com/questions/1715224/very-fast-memcpy-for-image-processing,
+// supposedly by William Chan
+// void X_aligned_memcpy_sse2(void* dest, const void* src, const unsigned long size_t);
+
 // taken from theoraplay.c
+// The memcpy calls in this function make up about 13.8% of total cpu time for video playback
+// Alternative:
+// -> make the output 'surface' o the size ycbcr[k].width,height, and then do clipping once the data is in video memory,
+// ie for sdl by setting the sdl rect appropriately, or in openGL by drawing the correct part of the output texture.
 void _VideoClip(th_ycbcr_buffer ycbcr, char *pixels, th_info *tinfo)
 {
     int i;
@@ -478,17 +570,37 @@ void _VideoClip(th_ycbcr_buffer ycbcr, char *pixels, th_info *tinfo)
     int yoff = (tinfo->pic_x & ~1) + ycbcr[0].stride * (tinfo->pic_y & ~1);
     int uvoff = (tinfo->pic_x / 2) + (ycbcr[1].stride) * (tinfo->pic_y / 2);
     
-	for (i = 0; i < h; i++, pixels += w)
-		memcpy(pixels, ycbcr[0].data + yoff + ycbcr[0].stride * i, w);
-	for (i = 0; i < (h / 2); i++, pixels += w/2)
-		memcpy(pixels, ycbcr[1].data + uvoff + ycbcr[1].stride * i, w / 2);
-	for (i = 0; i < (h / 2); i++, pixels += w/2)
-		memcpy(pixels, ycbcr[2].data + uvoff + ycbcr[2].stride * i, w / 2);
-
+    //printf("buffer sizes: (%d,%d), (%d,%d), (%d,%d)\n", ycbcr[0].width,ycbcr[0].height,ycbcr[1].width,ycbcr[1].height,ycbcr[2].width,ycbcr[2].height);
+    //printf("buffer strides: %d,%d,%d\n", ycbcr[0].stride,ycbcr[1].stride,ycbcr[2].stride);
+    //printf("Video size: (%d,%d)\n", w,h);
+    //if(ycbcr[0].stride == w)
+    //    memcpy(pixels, ycbcr[0].data + yoff, w * h);
+    //else
+    //{
+    for (i = 0; i < h; i++, pixels += w)
+        memcpy(pixels, ycbcr[0].data + yoff + ycbcr[0].stride * i, w);
+    //}
+	
+    //if(2*ycbcr[1].stride == w)
+    //    memcpy(pixels, ycbcr[1].data + uvoff, (w * h) / 4);
+    //else
+    //{
+    for (i = 0; i < (h / 2); i++, pixels += w/2)
+        memcpy(pixels, ycbcr[1].data + uvoff + ycbcr[1].stride * i, w / 2);
+    //}
+    
+    //if(2*ycbcr[2].stride == w)
+    //    memcpy(pixels, ycbcr[2].data + uvoff, (w * h) / 4);
+    //else
+    //{
+    for (i = 0; i < (h / 2); i++, pixels += w/2)
+        memcpy(pixels, ycbcr[2].data + uvoff + ycbcr[2].stride * i, w / 2);
+    //}
 } // end _VideoClip
 
-static void _dotpacket(MediaDecoder *md, ogg_packet *packet)
+static int _dotpacket(MediaDecoder *md, ogg_packet *packet)
 {
+    int res;
 	VideoFrame *frm;
     th_ycbcr_buffer ycbcr;
     int k;
@@ -496,36 +608,43 @@ static void _dotpacket(MediaDecoder *md, ogg_packet *packet)
     // static int pcnt = 0;
     
     if(VBroom(&md->vBuffer) <= 0)
-		return;
+		return 1;
     
     // printf("Processed %d packets\n", pcnt);
     // pcnt++;
     // decode the video page packet
     // if there is a problem, or eg this is a header, we don't do anything more with it
     ogg_int64_t granulepos = 0;
-    if(th_decode_packetin(md->tdec, packet, &granulepos) != 0)
-		return;
+    if((res = th_decode_packetin(md->tdec, packet, &granulepos)) != 0)
+    {
+        if(res == TH_DUPFRAME) md->vcnt++;
+		return 1;
+    }
 	
 	if(th_decode_ycbcr_out(md->tdec, ycbcr) != 0)
-        return;
+        return 1;
     
     frm = VBgetAddItem(&md->vBuffer);
     
     // copy ycbcr data into frm->pixels with clipping
+    // !! Almost all computation time of this function is in the following line.
     _VideoClip(ycbcr, frm->pixels, &md->tinfo);
     
     frm->vindex = md->vcnt;
+    
+    // printf("Video Packet (%d)\n", frm->vindex);
     
     // printf("Buffering Video Packet (%d) gr %ld\n", frm->vindex, granulepos);
     
     // printf("Adding a video frame at async=%d\n", frm->async);
     md->vcnt++;
     // that's it, the video frame is already added
+    return 0;
 }
 
 int time2vindex(MediaDecoder *md, int time_ms)
 {
-    return (time_ms * md->tinfo.fps_numerator) / (md->tinfo.fps_denominator * 1000);
+    return (time_ms * (int)md->tinfo.fps_numerator) / ((int)md->tinfo.fps_denominator * 1000);
 }
 
 int vindex2time(MediaDecoder *md, int vindex)
@@ -542,7 +661,7 @@ static int _dovpacket(MediaDecoder *md, ogg_packet *packet)
     int samples,shave,k,j,len;
     float **pcm;
     
-    // printf("Processed Audio Packet\n");
+    // printf("    Audio Packet\n");
     
 	// if there is a problem eg this is a header, we don't do anything more with it
     if(vorbis_synthesis(&md->vblock, packet))
